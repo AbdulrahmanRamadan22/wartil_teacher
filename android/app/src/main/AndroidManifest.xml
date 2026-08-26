@@ -1,8 +1,44 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- PERMISSIONS                                          -->
+    <!-- ═══════════════════════════════════════════════════ -->
+
+    <!-- الإنترنت - مطلوب لكل API calls و Pusher و Agora -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
+    <!-- الكاميرا والمايكروفون - مطلوب لـ Agora Video/Audio -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+
+    <!-- الإشعارات - مطلوب لـ flutter_local_notifications -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+
+    <!-- المكالمات - مطلوب لـ flutter_callkit_incoming -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.CALL_PHONE"/>
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS"/>
+
+    <!-- Bluetooth - مطلوب لتوجيه الصوت للسماعات في Android 12+ -->
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+
+    <!-- Wake Lock - يمنع الشاشة من الإغلاق أثناء المكالمة -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- APPLICATION                                          -->
+    <!-- ═══════════════════════════════════════════════════ -->
     <application
         android:label="waratel_app"
         android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
+        android:icon="@mipmap/launcher_icon"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

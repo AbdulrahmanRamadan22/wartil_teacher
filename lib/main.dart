@@ -31,12 +31,19 @@ void main() async {
   debugPrint('✅ [APP START] WidgetsFlutterBinding initialized');
 
   // تحميل ملفات البيئة
-  await dotenv.load(fileName: ".env");
-  debugPrint('✅ [APP START] Environment variables loaded');
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    // ملف .env قد لا يوجد في بعض بيئات الـ release
+    debugPrint('⚠️ [APP START] dotenv load failed: $e');
+  }
 
   // تهيئة الإشعارات المحلية
-  await LocalNotificationService.initialize();
-  debugPrint('✅ [APP START] LocalNotificationService initialized');
+  try {
+    await LocalNotificationService.initialize();
+  } catch (e) {
+    debugPrint('⚠️ [APP START] LocalNotificationService failed: $e');
+  }
 
   // ── تأمين الاتجاه عمودياً (Portrait) فقط ─────────────────
   await SystemChrome.setPreferredOrientations([
@@ -52,25 +59,26 @@ void main() async {
     ),
   );
 
+  // ── تهيئة SharedPreferences ──────────────────────────────
   try {
-    debugPrint('🚀 [APP START] 1. Initializing SharedPreferences...');
-    await SharedPreferencesService.init().timeout(
-      const Duration(seconds: 5),
-      onTimeout: () =>
-          debugPrint('⚠️ [APP START] SharedPreferences init timed out'),
-    );
-
-    debugPrint('🚀 [APP START] 2. Setting up Dependency Injection...');
-    await setupGetIt().timeout(
-      const Duration(seconds: 5),
-      onTimeout: () => debugPrint('⚠️ [APP START] setupGetIt timed out'),
-    );
-
-    debugPrint('🚀 [APP START] 3. Running App...');
-    runApp(const WaratelApp());
-    debugPrint('✅ [APP START] App launched successfully');
+    await SharedPreferencesService.init();
   } catch (e, stack) {
-    debugPrint('❌ [APP START CRITICAL ERROR] $e');
+    // لا نوقف التطبيق - نكمل حتى لو SharedPreferences فشل
+    debugPrint('⚠️ [APP START] SharedPreferences error (continuing): $e');
     debugPrint('STK: $stack');
   }
+
+  // ── تهيئة Dependency Injection ───────────────────────────
+  try {
+    await setupGetIt();
+  } catch (e, stack) {
+    // لا نوقف التطبيق - نسجّل الخطأ ونكمل
+    debugPrint('❌ [APP START] setupGetIt error (continuing): $e');
+    debugPrint('STK: $stack');
+  }
+
+  // ── تشغيل التطبيق دائماً بغض النظر عن أي خطأ سابق ───────
+  debugPrint('🚀 [APP START] 3. Running App...');
+  runApp(const WaratelApp());
+  debugPrint('✅ [APP START] App launched successfully');
 }
