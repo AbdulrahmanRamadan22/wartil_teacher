@@ -82,3 +82,4 @@ void main() async {
   runApp(const WaratelApp());
   debugPrint('✅ [APP START] App launched successfully');
 }
+
