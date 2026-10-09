@@ -10,6 +10,7 @@ import 'package:waratel_app/features/localization/data/app_localizations.dart';
 import 'package:waratel_app/features/localization/logic/cubit/locale_cubit.dart';
 import 'package:waratel_app/features/localization/logic/cubit/locale_state.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:waratel_app/features/profile/ui/widgets/achievement_plan_summary_card.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -210,6 +211,8 @@ class ProfileScreen extends StatelessWidget {
           _buildInfoRow(context, Icons.language, 'languages'.tr(context),
               app?.languages.join('، ') ?? '-'),
         ]),
+        SizedBox(height: 20.h),
+        const AchievementPlanSummaryCard(),
       ],
     );
   }

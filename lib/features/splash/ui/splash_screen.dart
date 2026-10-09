@@ -128,6 +128,13 @@ class _SplashScreenState extends State<SplashScreen>
                         child: Image.asset(
                           'assets/icons/ورتل ايقون (1).png',
                           fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Center(
+                            child: Icon(
+                              Icons.menu_book_rounded,
+                              color: Colors.white,
+                              size: 70.sp,
+                            ),
+                          ),
                         ),
                       ),
                     ),

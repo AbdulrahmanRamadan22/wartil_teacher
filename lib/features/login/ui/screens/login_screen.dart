@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:waratel_app/core/theming/colors.dart';
 import 'package:waratel_app/core/theming/styles.dart';
 import 'package:waratel_app/core/routing/routers.dart';
-import 'package:waratel_app/core/helpers/assets.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:waratel_app/core/di/dependency_injection.dart';
 import 'package:waratel_app/features/login/logic/cubit/login_cubit.dart';
 import 'package:waratel_app/features/login/logic/cubit/login_state.dart';
-import 'package:waratel_app/core/di/dependency_injection.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -72,6 +71,20 @@ class LoginScreen extends StatelessWidget {
                                 height: 120.h,
                                 width: 120.h,
                                 fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                  height: 120.h,
+                                  width: 120.h,
+                                  decoration: const BoxDecoration(
+                                    color: ColorsManager.primaryColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.menu_book_rounded,
+                                    color: Colors.white,
+                                    size: 55.sp,
+                                  ),
+                                ),
                               ),
                             ),
                           ),

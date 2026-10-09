@@ -32,6 +32,13 @@ class SplashAnimatedLogo extends StatelessWidget {
                 child: Image.asset(
                   AppAssets.appLogo,
                   fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => Center(
+                    child: Icon(
+                      Icons.menu_book_rounded,
+                      color: Colors.white,
+                      size: 90.sp,
+                    ),
+                  ),
                 ),
               ),
             ),
