@@ -55,7 +55,7 @@ class BookingsCubit extends Cubit<BookingsState> {
     }
   }
 
-  Future<void> startCall(int slotId, int callSessionId, String studentName) async {
+  Future<void> startCall(int slotId, int callSessionId, String studentName, {int? studentId}) async {
     emit(StartCallLoading());
     try {
       final response = await _repo.startBooking(slotId, callSessionId);
@@ -66,6 +66,7 @@ class BookingsCubit extends Cubit<BookingsState> {
           uid: response.uid,
           studentName: studentName,
           callId: callSessionId > 0 ? callSessionId : slotId, // Use slotId as fallback callId
+          studentId: studentId,
         ));
       } else {
         emit(StartCallError('فشل بدء المكالمة'));

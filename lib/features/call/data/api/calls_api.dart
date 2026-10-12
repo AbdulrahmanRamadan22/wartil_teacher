@@ -33,4 +33,13 @@ class CallsApi {
     final response = await _dio.post(ApiConstants.teacherEndCall(callId));
     return EndCallResponse.fromJson(response.data);
   }
+
+  /// POST /teacher/reports
+  Future<dynamic> submitReport(Map<String, dynamic> body) async {
+    final response = await _dio.post(
+      ApiConstants.teacherReports,
+      data: body,
+    );
+    return response.data;
+  }
 }

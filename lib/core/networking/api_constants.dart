@@ -54,6 +54,9 @@ class ApiConstants {
   static const String teacherRatings = 'teacher/ratings';
   static const String teacherContactSettings = 'teacher/contact-settings';
 
+  // Reports Endpoints
+  static const String teacherReports = 'teacher/reports';
+
   // Notifications Endpoints
   static const String notifications = 'notifications';
   static const String notificationsMarkAsRead = 'notifications/mark-as-read';

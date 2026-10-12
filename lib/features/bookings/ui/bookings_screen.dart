@@ -10,6 +10,7 @@ import 'package:waratel_app/features/localization/data/app_localizations.dart';
 import 'package:waratel_app/features/bookings/logic/cubit/bookings_cubit.dart';
 import 'package:waratel_app/features/bookings/logic/cubit/bookings_state.dart';
 import 'package:waratel_app/features/bookings/data/models/booking_model.dart';
+import 'package:waratel_app/features/call/ui/widgets/session_report_dialog.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class BookingsScreen extends StatelessWidget {
@@ -29,6 +30,7 @@ class BookingsScreen extends StatelessWidget {
               'uid': state.uid,
               'studentName': state.studentName,
               'callId': state.callId,
+              'studentId': state.studentId,
             },
           );
         } else if (state is StartCallError) {
@@ -256,6 +258,7 @@ class _BookingCard extends StatelessWidget {
                               booking.slotId,
                               booking.callDetails?.id ?? 0,
                               booking.student.name,
+                              studentId: booking.student.id,
                             );
                       },
                       style: ElevatedButton.styleFrom(
@@ -267,11 +270,48 @@ class _BookingCard extends StatelessWidget {
                       ),
                       child: Text('enter'.tr(context)),
                     ),
+                  if (booking.bookingStatus == 'absent' || (!showCancel && booking.isPast))
+                    ElevatedButton(
+                      onPressed: () => _showAbsentEvaluationDialog(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20.r),
+                        ),
+                      ),
+                      child: Text(
+                        'evaluate_student'.tr(context),
+                        style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold),
+                      ),
+                    ),
                 ],
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  void _showAbsentEvaluationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => SessionReportDialog(
+        studentName: booking.student.name,
+        trackName: 'memorization_track'.tr(context),
+        studentId: booking.student.id,
+        reportableType: 'slot',
+        reportableId: booking.slotId,
+        initialIsPresent: false,
+        isAttendanceLocked: true,
+        onSuccess: () {
+          Navigator.pop(dialogContext);
+          context.read<BookingsCubit>().loadBookings();
+        },
       ),
     );
   }

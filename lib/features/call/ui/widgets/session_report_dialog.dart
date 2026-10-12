@@ -7,6 +7,8 @@ import 'package:waratel_app/features/record/logic/cubit/record_cubit.dart';
 import 'package:waratel_app/features/record/data/models/session_model.dart';
 import 'package:waratel_app/features/localization/data/app_localizations.dart';
 import 'package:waratel_app/features/call/data/models/call_model.dart';
+import 'package:waratel_app/features/call/data/models/student_report_model.dart';
+import 'package:waratel_app/features/call/data/repos/calls_repo.dart';
 import 'package:waratel_app/features/bookings/logic/cubit/bookings_cubit.dart';
 import 'package:waratel_app/features/schedule/logic/cubit/schedule_cubit.dart';
 import 'package:intl/intl.dart';
@@ -17,6 +19,11 @@ class SessionReportDialog extends StatefulWidget {
   final String? startTime;
   final String? duration;
   final int? sessionId;
+  final int? studentId;
+  final String reportableType; // 'call', 'slot', 'session'
+  final int? reportableId;
+  final bool? initialIsPresent;
+  final bool isAttendanceLocked;
   final VoidCallback? onSuccess;
 
   const SessionReportDialog({
@@ -26,6 +33,11 @@ class SessionReportDialog extends StatefulWidget {
     this.startTime,
     this.duration,
     this.sessionId,
+    this.studentId,
+    this.reportableType = 'call',
+    this.reportableId,
+    this.initialIsPresent,
+    this.isAttendanceLocked = false,
     this.onSuccess,
   });
 
@@ -37,12 +49,14 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
   final notesController = TextEditingController();
   final nextAssignmentController = TextEditingController();
   String selectedRating = 'excellent';
-  bool isPresent = true;
+  late bool isPresent;
+  bool isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
     selectedRating = 'excellent';
+    isPresent = widget.initialIsPresent ?? true;
   }
 
   final List<String> ratings = [
@@ -63,7 +77,6 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final dateStr = DateFormat('yyyy-MM-dd').format(now);
-    // Use jm() for localized 12h format (e.g. 6:57 PM or 6:57 م)
     final timeStr = widget.startTime ?? DateFormat.jm().format(now);
 
     return Dialog(
@@ -164,7 +177,7 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
 
               Divider(height: 30.h, color: Colors.grey.shade100),
 
-              // Attendance
+              // Attendance Status
               _buildSectionTitle('attendance_status'.tr(context)),
               SizedBox(height: 10.h),
               Row(
@@ -173,7 +186,12 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
                     child: _buildAttendanceOption(
                       label: 'absent'.tr(context),
                       isSelected: !isPresent,
-                      onTap: () => setState(() => isPresent = false),
+                      isEnabled: !widget.isAttendanceLocked || !isPresent,
+                      onTap: () {
+                        if (!widget.isAttendanceLocked || !isPresent) {
+                          setState(() => isPresent = false);
+                        }
+                      },
                     ),
                   ),
                   SizedBox(width: 10.w),
@@ -181,38 +199,44 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
                     child: _buildAttendanceOption(
                       label: 'present'.tr(context),
                       isSelected: isPresent,
-                      onTap: () => setState(() => isPresent = true),
+                      isEnabled: !widget.isAttendanceLocked || isPresent,
+                      onTap: () {
+                        if (!widget.isAttendanceLocked || isPresent) {
+                          setState(() => isPresent = true);
+                        }
+                      },
                       isPositive: true,
                     ),
                   ),
                 ],
               ),
 
+              // If Present: Show Level Rating & Content
+              if (isPresent) ...[
+                SizedBox(height: 20.h),
+                // Reception Level Rating
+                _buildSectionTitle('reception_rating'.tr(context)),
+                SizedBox(height: 10.h),
+                Wrap(
+                  spacing: 10.w,
+                  runSpacing: 10.h,
+                  alignment: WrapAlignment.center,
+                  children: ratings.map((rating) {
+                    return SizedBox(
+                      width: (MediaQuery.of(context).size.width - 100.w) / 2,
+                      child: _buildRatingOption(
+                        label: rating.tr(context),
+                        isSelected: selectedRating == rating,
+                        onTap: () => setState(() => selectedRating = rating),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+
               SizedBox(height: 20.h),
 
-              // Rating
-              _buildSectionTitle('reception_rating'.tr(context)),
-              SizedBox(height: 10.h),
-              Wrap(
-                spacing: 10.w,
-                runSpacing: 10.h,
-                alignment: WrapAlignment.center,
-                children: ratings.map((rating) {
-                  return SizedBox(
-                    width: (MediaQuery.of(context).size.width - 100.w) /
-                        2, // Approx half width
-                    child: _buildRatingOption(
-                      label: rating.tr(context),
-                      isSelected: selectedRating == rating,
-                      onTap: () => setState(() => selectedRating = rating),
-                    ),
-                  );
-                }).toList(),
-              ),
-
-              SizedBox(height: 20.h),
-
-              // Notes
+              // Educational Notes
               _buildSectionTitle('educational_notes'.tr(context)),
               SizedBox(height: 10.h),
               TextFormField(
@@ -220,7 +244,9 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
                 maxLines: 3,
                 style: TextStyle(fontSize: 14.sp),
                 decoration: InputDecoration(
-                  hintText: 'educational_notes_hint'.tr(context),
+                  hintText: isPresent
+                      ? 'educational_notes_hint'.tr(context)
+                      : 'notes'.tr(context),
                   hintStyle:
                       TextStyle(fontSize: 12.sp, color: Colors.grey.shade500),
                   filled: true,
@@ -240,59 +266,71 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
                 ),
               ),
 
-              SizedBox(height: 20.h),
-              // Next Assignment (Now called Session Content in localizations)
-              _buildSectionTitle('next_assignment_label'.tr(context)),
-              SizedBox(height: 10.h),
-              TextFormField(
-                controller: nextAssignmentController,
-                style: TextStyle(fontSize: 14.sp),
-                decoration: InputDecoration(
-                  hintText: 'assignment_example'.tr(context),
-                  hintStyle:
-                      TextStyle(fontSize: 12.sp, color: Colors.grey.shade500),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                  prefixIcon: Icon(Icons.menu_book,
-                      color: ColorsManager.primaryColor, size: 20.sp),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.r),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.r),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.r),
-                    borderSide: BorderSide(color: ColorsManager.primaryColor),
+              if (isPresent) ...[
+                SizedBox(height: 20.h),
+                // Session Content
+                _buildSectionTitle('next_assignment_label'.tr(context)),
+                SizedBox(height: 10.h),
+                TextFormField(
+                  controller: nextAssignmentController,
+                  style: TextStyle(fontSize: 14.sp),
+                  decoration: InputDecoration(
+                    hintText: 'assignment_example'.tr(context),
+                    hintStyle:
+                        TextStyle(fontSize: 12.sp, color: Colors.grey.shade500),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    prefixIcon: Icon(Icons.menu_book,
+                        color: ColorsManager.primaryColor, size: 20.sp),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                      borderSide: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                      borderSide: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                      borderSide: BorderSide(color: ColorsManager.primaryColor),
+                    ),
                   ),
                 ),
-              ),
+              ],
 
               SizedBox(height: 30.h),
 
-              // Action Button
+              // Submit Action Button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _saveAndEnd,
+                  onPressed: isSubmitting ? null : _saveAndEnd,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: ColorsManager.primaryColor,
+                    disabledBackgroundColor: Colors.grey.shade300,
                     padding: EdgeInsets.symmetric(vertical: 14.h),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12.r),
                     ),
                   ),
-                  child: Text(
-                    'save_report_end_session'.tr(context),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: isSubmitting
+                      ? SizedBox(
+                          height: 20.h,
+                          width: 20.h,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'save_report_end_session'.tr(context),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -348,33 +386,60 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
   }
 
   void _saveAndEnd() async {
+    final statusStr = isPresent ? 'completed'.tr(context) : 'absent'.tr(context);
+    final ratingStr = isPresent ? selectedRating.tr(context) : 'absent'.tr(context);
+
+    setState(() => isSubmitting = true);
+
     final now = DateTime.now();
 
-    // Create Session Model
+    // 1. Prepare Backend Report Request
+    final int repId = widget.reportableId ?? widget.sessionId ?? 0;
+    final int sId = widget.studentId ?? 0;
+
+    final request = StudentReportRequest(
+      studentId: sId,
+      reportableType: widget.reportableType,
+      reportableId: repId,
+      attendanceStatus: isPresent ? 'present' : 'absent',
+      receptionLevel: isPresent ? selectedRating : null,
+      notes: notesController.text.trim().isNotEmpty
+          ? notesController.text.trim()
+          : null,
+      sessionContent: isPresent && nextAssignmentController.text.trim().isNotEmpty
+          ? nextAssignmentController.text.trim()
+          : null,
+    );
+
+    try {
+      if (sId > 0 && repId > 0) {
+        await getIt<CallsRepo>().submitReport(request.toJson());
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error submitting report to backend: $e');
+    }
+
+    // 2. Save to Local RecordCubit for session history
     final session = SessionModel(
       studentName: widget.studentName,
       date: DateFormat('yyyy-MM-dd').format(now),
       time: widget.startTime ?? DateFormat.jm().format(now),
       duration: widget.duration ?? '00:00',
       trackName: widget.trackName,
-      status: 'completed'.tr(context),
+      status: statusStr,
       notes: notesController.text,
       nextAssignment: nextAssignmentController.text,
-      rating: selectedRating.tr(context),
+      rating: ratingStr,
       isPresent: isPresent,
     );
 
-    // Save to RecordCubit
     getIt<RecordCubit>().addSession(session);
 
-    // End Session on Server is already handled by CallCubit before opening this dialog.
+    // 3. Refresh Providers
+    getIt<HomeCubit>().loadSoon();
+    getIt<BookingsCubit>().loadBookings();
+    getIt<ScheduleCubit>().loadSchedule();
 
-    // Refresh All Data Providers
-    getIt<HomeCubit>().loadSoon(); // Refresh Home card
-    getIt<BookingsCubit>().loadBookings(); // Refresh "My Sessions" tab
-    getIt<ScheduleCubit>().loadSchedule(); // Refresh "Schedule" tab
-
-    // Compatibility update for HomeCubit recent calls
     final newReview = CallModel(
       id: 0,
       studentName: widget.studentName,
@@ -386,13 +451,17 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
     );
     getIt<HomeCubit>().addCall(newReview);
 
+    if (mounted) {
+      setState(() => isSubmitting = false);
+    }
+
     // Close Dialog and Call Screen
     if (widget.onSuccess != null) {
       widget.onSuccess!();
     } else {
       if (mounted) {
-        Navigator.of(context).pop(); // Close Dialog
-        Navigator.of(context).pop(); // Close Call Screen
+        Navigator.of(context).pop();
+        Navigator.of(context).pop();
       }
     }
   }
@@ -415,13 +484,40 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
     required String label,
     required bool isSelected,
     required VoidCallback onTap,
+    bool isEnabled = true,
     bool isPositive = false,
   }) {
     Color activeColor =
         isPositive ? ColorsManager.primaryColor : Colors.redAccent;
 
+    // Disabled appearance
+    if (!isEnabled) {
+      return Container(
+        padding: EdgeInsets.symmetric(vertical: 12.h),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(
+            color: Colors.grey.shade300,
+            width: 1.w,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey.shade400,
+              fontWeight: FontWeight.bold,
+              fontSize: 14.sp,
+            ),
+          ),
+        ),
+      );
+    }
+
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(12.r),
       child: Container(
         padding: EdgeInsets.symmetric(vertical: 12.h),
         decoration: BoxDecoration(
@@ -453,6 +549,7 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
   }) {
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(12.r),
       child: Container(
         padding: EdgeInsets.symmetric(vertical: 12.h),
         decoration: BoxDecoration(

@@ -221,6 +221,7 @@ class _NextSessionCardState extends State<NextSessionCard> {
                               'uid': state.uid,
                               'studentName': state.studentName,
                               'callId': state.callId,
+                              'studentId': state.studentId,
                             },
                           );
                         }
@@ -233,6 +234,7 @@ class _NextSessionCardState extends State<NextSessionCard> {
                                   booking.slotId,
                                   booking.callDetails?.id ?? 0,
                                   booking.student.name,
+                                  studentId: booking.student.id,
                                 );
                           },
                         );

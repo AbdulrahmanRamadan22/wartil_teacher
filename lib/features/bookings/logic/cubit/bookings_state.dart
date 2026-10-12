@@ -42,12 +42,14 @@ class StartCallSuccess extends BookingsState {
   final int uid;
   final String studentName;
   final int callId;
+  final int? studentId;
   StartCallSuccess({
     required this.token,
     required this.channel,
     required this.uid,
     required this.studentName,
     required this.callId,
+    this.studentId,
   });
 }
 

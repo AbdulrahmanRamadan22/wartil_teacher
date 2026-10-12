@@ -18,6 +18,7 @@ class CallScreen extends StatefulWidget {
   final int uid;
   final String studentName;
   final int? callId;
+  final int? studentId;
 
   const CallScreen({
     super.key,
@@ -26,6 +27,7 @@ class CallScreen extends StatefulWidget {
     required this.uid,
     this.studentName = '',
     this.callId,
+    this.studentId,
   });
 
   @override
@@ -70,6 +72,11 @@ class _CallScreenState extends State<CallScreen> {
                 startTime: _callStartTime,
                 duration: cubit.currentDurationString,
                 sessionId: widget.callId,
+                studentId: widget.studentId,
+                reportableType: 'call',
+                reportableId: widget.callId,
+                initialIsPresent: true,
+                isAttendanceLocked: true,
                 onSuccess: () {
                   Navigator.pop(dialogContext);
                   Navigator.pop(context);
@@ -99,6 +106,11 @@ class _CallScreenState extends State<CallScreen> {
                     startTime: _callStartTime,
                     duration: cubit.currentDurationString,
                     sessionId: widget.callId,
+                    studentId: widget.studentId,
+                    reportableType: 'call',
+                    reportableId: widget.callId,
+                    initialIsPresent: true,
+                    isAttendanceLocked: true,
                     onSuccess: () {
                       Navigator.pop(dialogContext); // Close dialog
                       Navigator.pop(context); // Close CallScreen
@@ -297,6 +309,11 @@ class _CallScreenState extends State<CallScreen> {
                   startTime: _callStartTime,
                   duration: cubit.currentDurationString,
                   sessionId: widget.callId,
+                  studentId: widget.studentId,
+                  reportableType: 'call',
+                  reportableId: widget.callId,
+                  initialIsPresent: true,
+                  isAttendanceLocked: true,
                   onSuccess: () {
                     Navigator.pop(context); // Close dialog
                     Navigator.pop(context); // Close CallScreen

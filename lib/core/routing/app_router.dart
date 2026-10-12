@@ -55,6 +55,9 @@ class AppRouter {
             callId: args['callId'] is int
                 ? args['callId']
                 : int.tryParse(args['callId']?.toString() ?? ''),
+            studentId: args['studentId'] is int
+                ? args['studentId']
+                : int.tryParse(args['studentId']?.toString() ?? ''),
           ),
         );
 

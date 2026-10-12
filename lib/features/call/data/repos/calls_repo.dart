@@ -22,4 +22,8 @@ class CallsRepo extends BaseRepository {
   Future<EndCallResponse> endCall(int callId) async {
     return handleApiCall(() => _api.endCall(callId));
   }
+
+  Future<dynamic> submitReport(Map<String, dynamic> body) async {
+    return handleApiCall(() => _api.submitReport(body));
+  }
 }
