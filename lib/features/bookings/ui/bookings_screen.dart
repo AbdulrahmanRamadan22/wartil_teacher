@@ -234,7 +234,7 @@ class _BookingCard extends StatelessWidget {
                   Icon(Icons.access_time, size: 16.sp, color: Colors.grey[600]),
                   SizedBox(width: 4.w),
                   Text(
-                    '${_formatTime(booking.startTime)} - ${_formatTime(booking.endTime)}',
+                    '${_formatTime(booking.startTime, context)} - ${_formatTime(booking.endTime, context)}',
                     style: TextStyle(fontSize: 13.sp, color: Colors.grey[600]),
                   ),
                 ],
@@ -285,12 +285,12 @@ class _BookingCard extends StatelessWidget {
     }
   }
 
-  String _formatTime(String time) {
+  String _formatTime(String time, BuildContext context) {
     try {
       final parts = time.split(':');
       final hour = int.parse(parts[0]);
       final minute = parts[1];
-      final amPm = hour >= 12 ? 'PM' : 'AM';
+      final amPm = hour >= 12 ? 'pm'.tr(context) : 'am'.tr(context);
       final h = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
       return '$h:$minute $amPm';
     } catch (_) {
@@ -303,7 +303,7 @@ class _BookingCard extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text('confirm'.tr(context)),
-        content: Text('هل أنت متأكد من إلغاء هذا الحجز؟'),
+        content: Text('cancel_session_confirm'.tr(context)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),

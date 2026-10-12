@@ -35,7 +35,7 @@
     <!-- APPLICATION                                          -->
     <!-- ═══════════════════════════════════════════════════ -->
     <application
-        android:label="waratel_app"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
         android:usesCleartextTraffic="true">

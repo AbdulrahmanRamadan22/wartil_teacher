@@ -125,9 +125,10 @@ class _QuranScreenState extends State<QuranScreen> {
         children: [
           Expanded(
             child: PageView.builder(
+              
               controller: _pageController,
               itemCount: totalPages,
-              reverse: true, // Mushaf navigation is RTL
+              reverse: false, // In Arabic (RTL), reverse: false means scrolling from right to left
               onPageChanged: (index) {
                 setState(() {
                   currentPage = index + 1;
@@ -184,10 +185,12 @@ class _QuranScreenState extends State<QuranScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _buildNavButton(
-                    Icons.chevron_left,
-                    () => _pageController.nextPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut)),
+                    Icons.chevron_right,
+                    currentPage >= totalPages
+                        ? null
+                        : () => _pageController.nextPage(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut)),
                 Column(
                   children: [
                     Text(
@@ -205,10 +208,12 @@ class _QuranScreenState extends State<QuranScreen> {
                   ],
                 ),
                 _buildNavButton(
-                    Icons.chevron_right,
-                    () => _pageController.previousPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut)),
+                    Icons.chevron_left,
+                    currentPage <= 1
+                        ? null
+                        : () => _pageController.previousPage(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut)),
               ],
             ),
           ),
@@ -228,13 +233,13 @@ class _QuranScreenState extends State<QuranScreen> {
     return '';
   }
 
-  Widget _buildNavButton(IconData icon, VoidCallback onPressed) {
+  Widget _buildNavButton(IconData icon, VoidCallback? onPressed) {
     return Container(
       decoration: BoxDecoration(
-          color: ColorsManager.primaryColor.withValues(alpha: 0.1),
+          color: onPressed == null ? Colors.grey.withValues(alpha: 0.1) : ColorsManager.primaryColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10.r)),
       child: IconButton(
-          icon: Icon(icon, color: ColorsManager.primaryColor),
+          icon: Icon(icon, color: onPressed == null ? Colors.grey : ColorsManager.primaryColor),
           onPressed: onPressed),
     );
   }

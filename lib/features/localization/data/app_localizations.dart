@@ -373,6 +373,10 @@ class AppLocalizations {
       'total_hours': 'Total Hours',
       'avg_rating_this_month': 'Avg Rating (Month)',
       'earnings_this_month': 'Earnings (Month)',
+      'upcoming': 'Upcoming',
+      'history': 'History',
+      'no_upcoming_sessions': 'No upcoming sessions',
+      'cancel_session_confirm': 'Are you sure you want to cancel this booking?',
     },
     'ar': {
       // General
@@ -730,6 +734,10 @@ class AppLocalizations {
       'total_hours': 'إجمالي الساعات',
       'avg_rating_this_month': 'تقييم الشهر',
       'earnings_this_month': 'أرباح الشهر',
+      'upcoming': 'القادمة',
+      'history': 'السابقة',
+      'no_upcoming_sessions': 'لا توجد جلسات قادمة',
+      'cancel_session_confirm': 'هل أنت متأكد من إلغاء هذا الحجز؟',
     },
   };
 

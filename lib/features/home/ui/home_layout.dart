@@ -7,7 +7,6 @@ import 'package:waratel_app/core/theming/colors.dart';
 import 'package:waratel_app/core/call/call_service.dart';
 import 'package:waratel_app/core/call/call_api_service.dart';
 import 'package:waratel_app/core/widgets/custom_drawer.dart';
-import 'package:waratel_app/core/widgets/draggable_floating_button.dart';
 import 'package:waratel_app/features/ads/logic/cubit/ads_cubit.dart';
 import 'package:waratel_app/features/home/logic/cubit/home_cubit.dart';
 import 'package:waratel_app/features/home/logic/cubit/home_state.dart';
@@ -19,7 +18,6 @@ import 'package:waratel_app/features/ratings/ui/ratings_screen.dart';
 import 'package:waratel_app/features/bookings/ui/bookings_screen.dart';
 import 'package:waratel_app/features/schedule/ui/schedule_screen.dart';
 import 'package:waratel_app/features/wallet/ui/wallet_screen.dart';
-import 'package:waratel_app/features/ai_chat/ui/ai_chat_screen.dart';
 import 'package:waratel_app/features/bookings/logic/cubit/bookings_cubit.dart';
 import 'package:waratel_app/features/notifications/logic/cubit/notifications_cubit.dart';
 
@@ -122,19 +120,19 @@ class _HomeLayoutState extends State<HomeLayout> {
                   ),
                   bottomNavigationBar: _BottomNav(cubit: cubit),
                 ),
-                DraggableFloatingButton(
-                  key: const ValueKey('draggable_fab'),
-                  initialOffset: const Offset(30, 80),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AiChatScreen(),
-                      ),
-                    );
-                  },
-                  child: const _FabContent(),
-                ),
+                // DraggableFloatingButton(
+                //   key: const ValueKey('draggable_fab'),
+                //   initialOffset: const Offset(30, 80),
+                //   onPressed: () {
+                //     Navigator.push(
+                //       context,
+                //       MaterialPageRoute(
+                //         builder: (context) => const AiChatScreen(),
+                //       ),
+                //     );
+                //   },
+                //   child: const _FabContent(),
+                // ),
               ],
             );
           },
