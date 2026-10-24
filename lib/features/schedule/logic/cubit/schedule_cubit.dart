@@ -17,17 +17,7 @@ class ScheduleCubit extends Cubit<ScheduleState> {
           await scheduleRepo.getMySlots(page: page, perPage: perPage);
 
       if (response.status && response.data != null) {
-        final newCalendar = response.data!.calendar;
-
-        final Map<String, List<SlotModel>> filteredCalendar = {};
-        newCalendar.forEach((date, slots) {
-          final activeSlots = slots.where((slot) => !slot.isPast).toList();
-          if (activeSlots.isNotEmpty) {
-            filteredCalendar[date] = activeSlots;
-          }
-        });
-
-        calendar = filteredCalendar;
+        calendar = response.data!.calendar;
         if (!isClosed) {
           emit(ScheduleLoaded(calendar, response.data!.pagination));
         }

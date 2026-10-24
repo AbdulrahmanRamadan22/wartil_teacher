@@ -35,14 +35,47 @@ class AchievementPlanCubit extends Cubit<AchievementPlanState> {
     }
   }
 
+  static const Map<String, String> _aliases = {
+    'تلقين': 'talqin',
+    'talqin': 'talqin',
+    'تلاوة': 'tilawat',
+    'tilawat': 'tilawat',
+    'تسميع': 'tasmie',
+    'tasmie': 'tasmie',
+    'إقراء وإجازة': 'iqra_ijaza',
+    'iqra_ijaza': 'iqra_ijaza',
+    'مبتدئ': 'beginner',
+    'beginner': 'beginner',
+    'متوسط': 'intermediate',
+    'intermediate': 'intermediate',
+    'متقدم': 'advanced',
+    'advanced': 'advanced',
+    '5-12': '5-12',
+    '13-59': '13-59',
+    '+60': '+60',
+  };
+
+  String? _findMatchingKey(Map<String, int> map, String key) {
+    if (map.containsKey(key)) return key;
+    final canonical = _aliases[key];
+    if (canonical != null) {
+      for (final k in map.keys) {
+        if (k == canonical || _aliases[k] == canonical) return k;
+      }
+    }
+    return null;
+  }
+
   // ── Toggle learning path ──────────────────────────────────────────────────
   void toggleLearningPath(String path) {
     final Map<String, int> updated =
         Map.from(_currentPreferences.learningPaths);
-    if (updated.containsKey(path)) {
-      updated.remove(path);
+    final existingKey = _findMatchingKey(updated, path);
+    if (existingKey != null) {
+      updated.remove(existingKey);
     } else {
-      updated[path] = 10;
+      final keyToAdd = _aliases[path] ?? path;
+      updated[keyToAdd] = 20;
     }
     _currentPreferences = _currentPreferences.copyWith(learningPaths: updated);
     _emitAndAutoSave();
@@ -51,10 +84,12 @@ class AchievementPlanCubit extends Cubit<AchievementPlanState> {
   // ── Toggle age group ──────────────────────────────────────────────────────
   void toggleAgeGroup(String ageGroup) {
     final Map<String, int> updated = Map.from(_currentPreferences.ageGroups);
-    if (updated.containsKey(ageGroup)) {
-      updated.remove(ageGroup);
+    final existingKey = _findMatchingKey(updated, ageGroup);
+    if (existingKey != null) {
+      updated.remove(existingKey);
     } else {
-      updated[ageGroup] = 20;
+      final keyToAdd = _aliases[ageGroup] ?? ageGroup;
+      updated[keyToAdd] = 20;
     }
     _currentPreferences = _currentPreferences.copyWith(ageGroups: updated);
     _emitAndAutoSave();
@@ -64,10 +99,12 @@ class AchievementPlanCubit extends Cubit<AchievementPlanState> {
   void toggleStudentLevel(String level) {
     final Map<String, int> updated =
         Map.from(_currentPreferences.studentLevels);
-    if (updated.containsKey(level)) {
-      updated.remove(level);
+    final existingKey = _findMatchingKey(updated, level);
+    if (existingKey != null) {
+      updated.remove(existingKey);
     } else {
-      updated[level] = 30;
+      final keyToAdd = _aliases[level] ?? level;
+      updated[keyToAdd] = 20;
     }
     _currentPreferences = _currentPreferences.copyWith(studentLevels: updated);
     _emitAndAutoSave();
@@ -79,24 +116,24 @@ class AchievementPlanCubit extends Cubit<AchievementPlanState> {
 
     if (category == 'learningPaths') {
       updated = Map.from(_currentPreferences.learningPaths);
-      if (updated.containsKey(key)) {
-        updated[key] = (updated[key]! + delta).clamp(0, 100);
-        _currentPreferences =
-            _currentPreferences.copyWith(learningPaths: updated);
-      }
+      final existingKey = _findMatchingKey(updated, key) ?? (_aliases[key] ?? key);
+      final currentVal = updated[existingKey] ?? 0;
+      updated[existingKey] = (currentVal + delta).clamp(0, 100);
+      _currentPreferences =
+          _currentPreferences.copyWith(learningPaths: updated);
     } else if (category == 'ageGroups') {
       updated = Map.from(_currentPreferences.ageGroups);
-      if (updated.containsKey(key)) {
-        updated[key] = (updated[key]! + delta).clamp(0, 100);
-        _currentPreferences = _currentPreferences.copyWith(ageGroups: updated);
-      }
+      final existingKey = _findMatchingKey(updated, key) ?? (_aliases[key] ?? key);
+      final currentVal = updated[existingKey] ?? 0;
+      updated[existingKey] = (currentVal + delta).clamp(0, 100);
+      _currentPreferences = _currentPreferences.copyWith(ageGroups: updated);
     } else if (category == 'studentLevels') {
       updated = Map.from(_currentPreferences.studentLevels);
-      if (updated.containsKey(key)) {
-        updated[key] = (updated[key]! + delta).clamp(0, 100);
-        _currentPreferences =
-            _currentPreferences.copyWith(studentLevels: updated);
-      }
+      final existingKey = _findMatchingKey(updated, key) ?? (_aliases[key] ?? key);
+      final currentVal = updated[existingKey] ?? 0;
+      updated[existingKey] = (currentVal + delta).clamp(0, 100);
+      _currentPreferences =
+          _currentPreferences.copyWith(studentLevels: updated);
     }
 
     _emitAndAutoSave();

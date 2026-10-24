@@ -155,6 +155,9 @@ class CallService {
     }
   }
 
+  // Callback when a call-ended/cancelled event is received via Pusher
+  static void Function(int callId)? onCallEndedByPeer;
+
   // ───────────────── 2. استقبال الحدث ────────────────────
   void _onPusherEvent(PusherEvent event) async {
     final name = event.eventName;
@@ -172,28 +175,78 @@ class CallService {
       return;
     }
 
-    // تمييز حدث المكالمة بشكل مرن — يقبل أي اسم يحتوي على 'call' أو 'incoming'
     final nameLower = name.toLowerCase();
+
+    // فك تشفير البيانات مسبقاً للتحقق من الحالة
+    Map<String, dynamic>? data;
+    try {
+      if (rawData is String && rawData.trim().startsWith('{')) {
+        data = jsonDecode(rawData) as Map<String, dynamic>;
+      } else if (rawData is Map<String, dynamic>) {
+        data = rawData;
+      }
+    } catch (e) {
+      debugPrint('⚠️ [PUSHER] فشل فك بيانات JSON: $e');
+    }
+
+    final statusStr = (data?['status'] ?? data?['call_status'] ?? '')
+        .toString()
+        .toLowerCase();
+
+    // 1. التحقق أولاً إذا كان الحدث يمثل انتهاء أو إلغاء للمكالمة
+    final bool isCallEnd = nameLower.contains('end') ||
+        nameLower.contains('cancel') ||
+        nameLower.contains('reject') ||
+        nameLower.contains('terminate') ||
+        nameLower.contains('finish') ||
+        statusStr == 'ended' ||
+        statusStr == 'cancelled' ||
+        statusStr == 'canceled' ||
+        statusStr == 'completed';
+
+    if (isCallEnd) {
+      debugPrint('🛑 [PUSHER] ✅ تم التعرف على انتهاء/إلغاء المكالمة! (حدث: "$name")');
+      final String callIdStr =
+          (data?['call_id'] ?? data?['id'] ?? '').toString();
+      final int callIdInt = int.tryParse(callIdStr) ?? 0;
+
+      // إغلاق أي شاشة رنين نشطة في CallKit
+      if (callIdStr.isNotEmpty) {
+        await FlutterCallkitIncoming.endCall(callIdStr);
+      } else {
+        await FlutterCallkitIncoming.endAllCalls();
+      }
+
+      // إخطار شاشة المكالمة الحالية لإنهائها فوراً
+      onCallEndedByPeer?.call(callIdInt);
+      return;
+    }
+
+    // 2. التحقق من مكالمة واردة
     final bool isIncomingCall =
         nameLower.contains('call') || nameLower.contains('incoming');
 
     if (isIncomingCall) {
       debugPrint('🚀 [PUSHER] ✅ تم التعرف على مكالمة واردة! (حدث: "$name")');
       try {
-        final Map<String, dynamic> data = (rawData is String)
-            ? jsonDecode(rawData) as Map<String, dynamic>
-            : rawData as Map<String, dynamic>;
+        final Map<String, dynamic> callData = data ??
+            ((rawData is String)
+                ? jsonDecode(rawData) as Map<String, dynamic>
+                : rawData as Map<String, dynamic>);
 
-        debugPrint('🔔 [PUSHER] بيانات المكالمة المفككة: $data');
+        debugPrint('🔔 [PUSHER] بيانات المكالمة المفككة: $callData');
 
-        final String callId = (data['call_id'] ?? data['id'] ?? '').toString();
+        final String callId =
+            (callData['call_id'] ?? callData['id'] ?? '').toString();
         final String studentName =
-            (data['student_name'] ?? data['caller_name'] ?? 'طالب').toString();
-        final String channelName = (data['channel_name'] ?? '').toString();
+            (callData['student_name'] ?? callData['caller_name'] ?? 'طالب')
+                .toString();
+        final String channelName =
+            (callData['channel_name'] ?? '').toString();
 
         if (callId.isEmpty) {
           debugPrint(
-              '⚠️ [PUSHER] لم نجد call_id في البيانات — مفاتيح البيانات: ${data.keys.toList()}');
+              '⚠️ [PUSHER] لم نجد call_id في البيانات — مفاتيح البيانات: ${callData.keys.toList()}');
           return;
         }
 

@@ -31,7 +31,7 @@ android {
 
     defaultConfig {
         applicationId = "com.wartilteacher.app"
-        // flutter_callkit_incoming و Agora يتطلبان minSdk 23 على الأقل
+        // flutter_callkit_incoming و Agora و permission_handler يتطلبان minSdk 23 على الأقل
         minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutter.versionCode

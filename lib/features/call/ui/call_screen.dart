@@ -37,11 +37,47 @@ class CallScreen extends StatefulWidget {
 class _CallScreenState extends State<CallScreen> {
   final AgoraService _agoraService = getIt<AgoraService>();
   String? _callStartTime;
+  bool _hasEndedOrLeft = false;
 
   @override
   void initState() {
     super.initState();
     _callStartTime = DateFormat.jm().format(DateTime.now());
+  }
+
+  void _showReportDialog(BuildContext context, CallCubit cubit) {
+    if (_hasEndedOrLeft) return;
+    _hasEndedOrLeft = true;
+
+    cubit.endCall();
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (dialogContext) => SessionReportDialog(
+        studentName: widget.studentName.isEmpty
+            ? 'student'.tr(context)
+            : widget.studentName,
+        trackName: 'memorization_track'.tr(context),
+        startTime: _callStartTime,
+        duration: cubit.currentDurationString,
+        sessionId: widget.callId,
+        studentId: widget.studentId,
+        reportableType: 'call',
+        reportableId: widget.callId,
+        initialIsPresent: true,
+        isAttendanceLocked: true,
+        onSuccess: () {
+          Navigator.of(dialogContext, rootNavigator: true).pop();
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
+        },
+      ),
+    );
   }
 
   @override
@@ -59,30 +95,23 @@ class _CallScreenState extends State<CallScreen> {
             Navigator.pop(context);
           } else if (state is CallRemoteUserLeft) {
             // Auto end the call when student leaves
-            final cubit = context.read<CallCubit>();
-            cubit.endCall();
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (dialogContext) => SessionReportDialog(
-                studentName: widget.studentName.isEmpty
-                    ? 'student'.tr(context)
-                    : widget.studentName,
-                trackName: 'memorization_track'.tr(context),
-                startTime: _callStartTime,
-                duration: cubit.currentDurationString,
-                sessionId: widget.callId,
-                studentId: widget.studentId,
-                reportableType: 'call',
-                reportableId: widget.callId,
-                initialIsPresent: true,
-                isAttendanceLocked: true,
-                onSuccess: () {
-                  Navigator.pop(dialogContext);
-                  Navigator.pop(context);
-                },
-              ),
-            );
+            if (!_hasEndedOrLeft && mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.call_end_rounded, color: Colors.white),
+                      SizedBox(width: 8.w),
+                      const Expanded(child: Text('قام الطالب بإنهاء المكالمة')),
+                    ],
+                  ),
+                  backgroundColor: Colors.orange.shade800,
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+              _showReportDialog(context, context.read<CallCubit>());
+            }
           }
         },
         builder: (context, state) {
@@ -93,30 +122,7 @@ class _CallScreenState extends State<CallScreen> {
             canPop: false,
             onPopInvokedWithResult: (didPop, result) {
               if (!didPop) {
-                // إنهاء المكالمة فوراً عند الرغبة في الخروج
-                cubit.endCall();
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (dialogContext) => SessionReportDialog(
-                    studentName: widget.studentName.isEmpty
-                        ? 'student'.tr(context)
-                        : widget.studentName,
-                    trackName: 'memorization_track'.tr(context),
-                    startTime: _callStartTime,
-                    duration: cubit.currentDurationString,
-                    sessionId: widget.callId,
-                    studentId: widget.studentId,
-                    reportableType: 'call',
-                    reportableId: widget.callId,
-                    initialIsPresent: true,
-                    isAttendanceLocked: true,
-                    onSuccess: () {
-                      Navigator.pop(dialogContext); // Close dialog
-                      Navigator.pop(context); // Close CallScreen
-                    },
-                  ),
-                );
+                _showReportDialog(context, cubit);
               }
             },
             child: Scaffold(

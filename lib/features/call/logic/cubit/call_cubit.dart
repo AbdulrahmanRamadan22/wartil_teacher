@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/agora/agora_service.dart';
+import '../../../../core/call/call_service.dart';
 import '../../data/repos/calls_repo.dart';
 import 'call_state.dart';
 
@@ -14,10 +16,12 @@ class CallCubit extends Cubit<CallState> {
   bool isMicOn = true;
   bool isCamOn = false; // ← مغلقة افتراضياً كما طلب المستخدم
   bool isSpeakerOn =
-      true; // ← مكبر الصوت يعمل افتراضياً عادة في المكالات الجماعية/الفيديو
+      true; // ← مكبر الصوت يعمل افتراضياً عادة في المكالمات
   bool isMushafOpen = false;
   Timer? _timer;
+  Timer? _statusCheckTimer;
   int _secondsElapsed = 0;
+  bool _isEnding = false;
 
   int? remoteUid;
   int? callId;
@@ -26,6 +30,7 @@ class CallCubit extends Cubit<CallState> {
 
   Future<void> joinAndStartCall(int callId) async {
     this.callId = callId;
+    _isEnding = false;
 
     Map<Permission, PermissionStatus> statuses = await [
       Permission.camera,
@@ -47,6 +52,7 @@ class CallCubit extends Cubit<CallState> {
 
       if (response.status && response.data != null) {
         _setupAgoraHandlers();
+        _setupPusherListener();
 
         await _agoraService.joinChannel(
           token: response.data!.agoraToken,
@@ -58,6 +64,8 @@ class CallCubit extends Cubit<CallState> {
         await _agoraService.enableLocalVideo(isCamOn);
 
         _startTimer();
+        _startStatusCheckTimer(callId);
+
         if (!isClosed) {
           emit(CallLoaded());
           emitToggles();
@@ -70,31 +78,77 @@ class CallCubit extends Cubit<CallState> {
     }
   }
 
-  // Obsolete - Keeping for backwards compatibility if needed elsewhere temporarily
-  Future<void> startCall({
-    required String token,
-    required String channelName,
-    required int uid,
-    int? callId,
-  }) async {
-    this.callId = callId;
-    // ... rest of archaic implementation ...
-  }
-
   void _setupAgoraHandlers() {
     _agoraService.onUserJoined = (uid) {
+      debugPrint('👥 [CALL_CUBIT] Remote user joined: $uid');
       remoteUid = uid;
-      emit(CallLoaded()); // Refresh to show remote video
-      emit(CallRemoteUserJoined(uid));
+      if (!isClosed && !_isEnding) {
+        emit(CallLoaded());
+        emit(CallRemoteUserJoined(uid));
+      }
     };
 
     _agoraService.onUserLeft = (uid) {
-      if (remoteUid == uid) {
-        remoteUid = null;
-        emit(CallLoaded());
-        emit(CallRemoteUserLeft(uid));
+      debugPrint(
+          '👥 [CALL_CUBIT] Remote user left: $uid (current remoteUid: $remoteUid)');
+      _handleRemoteUserLeft(uid);
+    };
+  }
+
+  void _setupPusherListener() {
+    CallService.onCallEndedByPeer = (endedCallId) {
+      debugPrint(
+          '🛑 [CALL_CUBIT] Received onCallEndedByPeer from Pusher: callId=$endedCallId');
+      if (callId == null || endedCallId == 0 || callId == endedCallId) {
+        _handleRemoteUserLeft(0);
       }
     };
+  }
+
+  void _startStatusCheckTimer(int callId) {
+    _statusCheckTimer?.cancel();
+    // فحص دوري خفيف كل 3 ثوان للتأكد من حالة المكالمة على السيرفر
+    _statusCheckTimer =
+        Timer.periodic(const Duration(seconds: 3), (timer) async {
+      if (isClosed || _isEnding) {
+        timer.cancel();
+        return;
+      }
+      try {
+        final detail = await _callsRepo.getCallDetail(callId);
+        if (detail.status) {
+          final status = detail.data.status.toLowerCase();
+          if (status == 'ended' ||
+              status == 'completed' ||
+              status == 'cancelled' ||
+              status == 'canceled' ||
+              status == 'rejected' ||
+              status == 'finished') {
+            debugPrint(
+                '🛑 [CALL_CUBIT] Server reported call status as "$status". Ending call.');
+            timer.cancel();
+            _handleRemoteUserLeft(0);
+          }
+        }
+      } catch (e) {
+        // تجاهل أي خطأ مؤقت في الاتصال أثناء المكالمة
+      }
+    });
+  }
+
+  void _handleRemoteUserLeft(int uid) {
+    if (_isEnding) return;
+    _isEnding = true;
+    debugPrint(
+        '🛑 [CALL_CUBIT] Student ended the call or disconnected. Emitting CallRemoteUserLeft.');
+    remoteUid = null;
+    _timer?.cancel();
+    _statusCheckTimer?.cancel();
+    CallService.onCallEndedByPeer = null;
+
+    if (!isClosed) {
+      emit(CallRemoteUserLeft(uid));
+    }
   }
 
   void toggleMic() {
@@ -121,6 +175,7 @@ class CallCubit extends Cubit<CallState> {
   }
 
   void emitToggles() {
+    if (isClosed) return;
     emit(CallTogglesUpdated(
       isMicOn: isMicOn,
       isCamOn: isCamOn,
@@ -134,7 +189,9 @@ class CallCubit extends Cubit<CallState> {
     _secondsElapsed = 0;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       _secondsElapsed++;
-      emit(CallTimerUpdated(_formatDuration(_secondsElapsed)));
+      if (!isClosed && !_isEnding) {
+        emit(CallTimerUpdated(_formatDuration(_secondsElapsed)));
+      }
     });
   }
 
@@ -145,13 +202,20 @@ class CallCubit extends Cubit<CallState> {
   }
 
   Future<void> endCall() async {
+    _isEnding = true;
     _timer?.cancel();
-    await _agoraService.leaveChannel();
+    _statusCheckTimer?.cancel();
+    CallService.onCallEndedByPeer = null;
+
+    try {
+      await _agoraService.leaveChannel();
+    } catch (_) {}
+
     if (callId != null) {
       try {
         await _callsRepo.endCall(callId!);
       } catch (e) {
-        // print('Error ending call on server: $e');
+        debugPrint('⚠️ Error ending call on server: $e');
       }
     }
     _resetAgoraHandlers();
@@ -164,9 +228,15 @@ class CallCubit extends Cubit<CallState> {
 
   @override
   Future<void> close() async {
+    _isEnding = true;
     _timer?.cancel();
-    await _agoraService.leaveChannel();
+    _statusCheckTimer?.cancel();
+    CallService.onCallEndedByPeer = null;
+    try {
+      await _agoraService.leaveChannel();
+    } catch (_) {}
     _resetAgoraHandlers();
     return super.close();
   }
 }
+

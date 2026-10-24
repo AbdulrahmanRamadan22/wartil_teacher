@@ -32,6 +32,38 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
     <!-- ═══════════════════════════════════════════════════ -->
+    <!-- HARDWARE FEATURES - required="false"                 -->
+    <!-- هذا القسم ضروري جداً لدعم التابلت وأجهزة Wi-Fi Only -->
+    <!-- بدونه، يضيف Android ضمنياً شرط وجود SIM/هاتف       -->
+    <!-- مما يجعل التطبيق "غير مدعوم" على التابلت            -->
+    <!-- ═══════════════════════════════════════════════════ -->
+
+    <!-- الهاتف / SIM - التطبيق لا يتطلبه (يعمل على Wi-Fi فقط) -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false"/>
+
+    <!-- الكاميرا - اختيارية (يمكن الاستخدام بدون كاميرا) -->
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.front" android:required="false"/>
+
+    <!-- Bluetooth - اختياري -->
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
+
+    <!-- Microphone - مطلوب للمكالمات الصوتية -->
+    <uses-feature android:name="android.hardware.microphone" android:required="true"/>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- SCREEN SUPPORT - دعم كل أحجام الشاشات والتابلت     -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <supports-screens
+        android:smallScreens="true"
+        android:normalScreens="true"
+        android:largeScreens="true"
+        android:xlargeScreens="true"
+        android:anyDensity="true"
+        android:resizeable="true"/>
+
+    <!-- ═══════════════════════════════════════════════════ -->
     <!-- APPLICATION                                          -->
     <!-- ═══════════════════════════════════════════════════ -->
     <application
