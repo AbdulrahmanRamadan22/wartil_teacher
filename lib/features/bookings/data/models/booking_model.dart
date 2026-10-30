@@ -65,6 +65,7 @@ class BookingModel {
   final BookingCallDetails? callDetails;
   final dynamic rating;
   final bool isPast;
+  final bool isReported;
 
   const BookingModel({
     this.bookingId,
@@ -77,6 +78,7 @@ class BookingModel {
     this.callDetails,
     this.rating,
     this.isPast = false,
+    this.isReported = false,
   });
 
   factory BookingModel.fromJson(Map<String, dynamic> json) {
@@ -119,6 +121,7 @@ class BookingModel {
       bookingStatus:
           (json['status'] ?? json['booking_status'] ?? '').toString(),
       isPast: json['is_past'] == true,
+      isReported: json['is_reported'] == true,
       student:
           BookingStudent.fromJson(json['student'] as Map<String, dynamic>?),
       callDetails:

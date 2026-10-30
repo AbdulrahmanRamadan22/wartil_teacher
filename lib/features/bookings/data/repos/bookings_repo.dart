@@ -28,8 +28,8 @@ class BookingsRepo extends BaseRepository implements IBookingsRepo {
     return handleApiCall(() => _api.cancelSlot(slotId));
   }
 
-  @override
-  Future<SoonResponse> getSoon() async {
-    return handleApiCall(() => _api.getSoon());
-  }
+  // @override
+  // Future<SoonResponse> getSoon() async {
+  //   return handleApiCall(() => _api.getSoon());
+  // }
 }

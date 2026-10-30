@@ -73,9 +73,11 @@ class _CallScreenState extends State<CallScreen> {
     final int effectiveReportableId =
         widget.reportableId ?? widget.callId ?? 0;
 
+    final navigator = Navigator.of(context);
+
     showDialog(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
       useRootNavigator: true,
       builder: (dialogContext) => SessionReportDialog(
         studentName: widget.studentName.isEmpty
@@ -89,15 +91,19 @@ class _CallScreenState extends State<CallScreen> {
         reportableType: effectiveReportableType,
         reportableId: effectiveReportableId,
         initialIsPresent: true,
-        isAttendanceLocked: true,
+        isAttendanceLocked: false,
         onSuccess: () {
           Navigator.of(dialogContext, rootNavigator: true).pop();
-          if (mounted) {
-            Navigator.of(context).pop();
-          }
+        },
+        onSkip: () {
+          Navigator.of(dialogContext, rootNavigator: true).pop();
         },
       ),
-    );
+    ).whenComplete(() {
+      if (mounted) {
+        navigator.pop();
+      }
+    });
   }
 
   @override

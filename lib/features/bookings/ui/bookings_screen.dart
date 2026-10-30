@@ -13,8 +13,25 @@ import 'package:waratel_app/features/bookings/data/models/booking_model.dart';
 import 'package:waratel_app/features/call/ui/widgets/session_report_dialog.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-class BookingsScreen extends StatelessWidget {
+class BookingsScreen extends StatefulWidget {
   const BookingsScreen({super.key});
+
+  @override
+  State<BookingsScreen> createState() => _BookingsScreenState();
+}
+
+class _BookingsScreenState extends State<BookingsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final cubit = context.read<BookingsCubit>();
+      if (cubit.state is BookingsInitial) {
+        cubit.loadBookings();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,35 +87,35 @@ class BookingsScreen extends StatelessWidget {
               indicatorColor: ColorsManager.primaryColor,
             ),
             Expanded(
-              child: RefreshIndicator(
-                onRefresh: () async =>
-                    context.read<BookingsCubit>().loadBookings(),
-                color: ColorsManager.primaryColor,
-                child: BlocBuilder<BookingsCubit, BookingsState>(
-                  buildWhen: (previous, current) =>
-                      current is BookingsLoading ||
-                      current is BookingsLoaded ||
-                      current is BookingsError,
-                  builder: (context, state) {
-                    if (state is BookingsLoading) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (state is BookingsLoaded) {
-                      return TabBarView(
-                        children: [
-                          _BookingsList(
-                            bookings: state.upcoming,
-                            emptyMessageKey: 'no_upcoming_sessions',
-                            showCancel: true,
-                          ),
-                          _BookingsList(
-                            bookings: state.history,
-                            emptyMessageKey: 'no_recorded_sessions',
-                            showCancel: false,
-                          ),
-                        ],
-                      );
-                    } else if (state is BookingsError) {
-                      return SingleChildScrollView(
+              child: BlocBuilder<BookingsCubit, BookingsState>(
+                buildWhen: (previous, current) =>
+                    current is BookingsLoading ||
+                    current is BookingsLoaded ||
+                    current is BookingsError,
+                builder: (context, state) {
+                  if (state is BookingsLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (state is BookingsLoaded) {
+                    return TabBarView(
+                      children: [
+                        _BookingsList(
+                          bookings: state.upcoming,
+                          emptyMessageKey: 'no_upcoming_sessions',
+                          showCancel: true,
+                        ),
+                        _BookingsList(
+                          bookings: state.history,
+                          emptyMessageKey: 'no_recorded_sessions',
+                          showCancel: false,
+                        ),
+                      ],
+                    );
+                  } else if (state is BookingsError) {
+                    return RefreshIndicator(
+                      onRefresh: () async =>
+                          context.read<BookingsCubit>().loadBookings(),
+                      color: ColorsManager.primaryColor,
+                      child: SingleChildScrollView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         child: SizedBox(
                           height: MediaQuery.of(context).size.height * 0.7,
@@ -118,11 +135,11 @@ class BookingsScreen extends StatelessWidget {
                             ),
                           ),
                         ),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
               ),
             ),
           ],
@@ -146,27 +163,35 @@ class _BookingsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (bookings.isEmpty) {
-      return SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: SizedBox(
-          height: MediaQuery.of(context).size.height * 0.6,
-          child: EmptyStateDisplay(
-            icon: Icons.assignment_turned_in_outlined,
-            message: emptyMessageKey.tr(context),
-            subMessage: 'sessions_history_subtitle'.tr(context),
+      return RefreshIndicator(
+        onRefresh: () async => context.read<BookingsCubit>().loadBookings(),
+        color: ColorsManager.primaryColor,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.6,
+            child: EmptyStateDisplay(
+              icon: Icons.assignment_turned_in_outlined,
+              message: emptyMessageKey.tr(context),
+              subMessage: 'sessions_history_subtitle'.tr(context),
+            ),
           ),
         ),
       );
     }
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.all(16.w),
-      itemCount: bookings.length,
-      itemBuilder: (context, index) {
-        return RepaintBoundary(
-          child: _BookingCard(booking: bookings[index], showCancel: showCancel),
-        );
-      },
+    return RefreshIndicator(
+      onRefresh: () async => context.read<BookingsCubit>().loadBookings(),
+      color: ColorsManager.primaryColor,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.all(16.w),
+        itemCount: bookings.length,
+        itemBuilder: (context, index) {
+          return RepaintBoundary(
+            child: _BookingCard(booking: bookings[index], showCancel: showCancel),
+          );
+        },
+      ),
     );
   }
 }
@@ -287,11 +312,11 @@ class _BookingCard extends StatelessWidget {
                       ),
                       child: Text('enter'.tr(context)),
                     ),
-                  if (booking.bookingStatus == 'absent' || (!showCancel && booking.isPast))
+                  if (!showCancel && booking.isPast && !booking.isReported)
                     ElevatedButton(
-                      onPressed: () => _showAbsentEvaluationDialog(context),
+                      onPressed: () => _showEvaluationDialog(context),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.redAccent,
+                        backgroundColor: ColorsManager.primaryColor,
                         foregroundColor: Colors.white,
                         elevation: 0,
                         padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
@@ -304,6 +329,31 @@ class _BookingCard extends StatelessWidget {
                         style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold),
                       ),
                     ),
+                  if (!showCancel && booking.isPast && booking.isReported)
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20.r),
+                        border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle_rounded,
+                              color: Colors.green, size: 14.sp),
+                          SizedBox(width: 4.w),
+                          Text(
+                            'تم التقييم',
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontSize: 11.sp,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ],
@@ -313,7 +363,7 @@ class _BookingCard extends StatelessWidget {
     );
   }
 
-  void _showAbsentEvaluationDialog(BuildContext context) {
+  void _showEvaluationDialog(BuildContext context) {
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -323,11 +373,14 @@ class _BookingCard extends StatelessWidget {
         studentId: booking.student.id,
         reportableType: 'slot',
         reportableId: booking.slotId,
-        initialIsPresent: false,
-        isAttendanceLocked: true,
+        initialIsPresent: booking.bookingStatus != 'absent',
+        isAttendanceLocked: false,
         onSuccess: () {
           Navigator.pop(dialogContext);
           context.read<BookingsCubit>().loadBookings();
+        },
+        onSkip: () {
+          Navigator.pop(dialogContext);
         },
       ),
     );

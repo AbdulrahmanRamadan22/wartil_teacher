@@ -5,5 +5,5 @@ abstract class IBookingsRepo {
   Future<StartCallResponse> startBooking(int bookingId);
   Future<dynamic> endBooking(int bookingId);
   Future<CancelSlotResponse> cancelSlot(int slotId);
-  Future<SoonResponse> getSoon();
+  // Future<SoonResponse> getSoon();
 }

@@ -22,17 +22,6 @@ import 'package:waratel_app/features/wallet/ui/wallet_screen.dart';
 import 'package:waratel_app/features/bookings/logic/cubit/bookings_cubit.dart';
 import 'package:waratel_app/features/notifications/logic/cubit/notifications_cubit.dart';
 
-// ── Screens are kept here (UI layer), NOT inside HomeCubit ──────────────────
-// This is a fixed list; it never changes — all five widgets are created once
-// and kept alive by IndexedStack, so switching tabs has zero rebuild cost.
-const List<Widget> _kScreens = [
-  RepaintBoundary(child: HomeScreen()), // 0 — الرئيسية
-  RepaintBoundary(child: ScheduleScreen()), // 1 — جدولي
-  RepaintBoundary(child: BookingsScreen()), // 2 — جلساتي
-  RepaintBoundary(child: RatingsScreen()), // 3 — المقرأة
-  RepaintBoundary(child: WalletScreen()), // 4 — المحفظة
-];
-
 class HomeLayout extends StatefulWidget {
   const HomeLayout({super.key});
 
@@ -41,6 +30,12 @@ class HomeLayout extends StatefulWidget {
 }
 
 class _HomeLayoutState extends State<HomeLayout> {
+  // ── Lazy Tab Loading ────────────────────────────────────────────────────────
+  // Only tab 0 (HomeScreen) is mounted on launch. Other tabs are mounted only when visited,
+  // preventing all background screens from firing their APIs simultaneously on boot.
+  // Once mounted, they stay in memory preserving their state and scroll position.
+  final Set<int> _visitedTabs = {0};
+
   @override
   void initState() {
     super.initState();
@@ -51,30 +46,22 @@ class _HomeLayoutState extends State<HomeLayout> {
       // 1. Listen for calls using the DI instance
       CallService.listenToCallEvents(getIt<CallApiService>());
 
-      // 2. Load initial data with staggered delays to prevent SSL/Network contention
-      Future.delayed(const Duration(milliseconds: 300), () async {
+      // 2. Load essential initial data first, then secondary data with staggered delays
+      Future.delayed(const Duration(milliseconds: 250), () async {
         if (!mounted) return;
-        debugPrint('🏠 [HOME LAYOUT] Starting staggered data load...');
+        debugPrint('🏠 [HOME LAYOUT] Starting essential data load (Profile & Next Booking)...');
 
-        // 2.1 Load Profile
+        // Priority 1: Profile & Soon Booking (Essential for Home UI)
         getIt<ProfileCubit>().getProfile();
-        await Future.delayed(const Duration(milliseconds: 200));
+        getIt<HomeCubit>().loadSoon();
+        getIt<HomeCubit>().getInitialOnlineStatus();
 
-        // 2.2 Load Ads (Already handled by BlocProvider create)
-        // if (mounted) context.read<AdsCubit>().getAds();
-        // await Future.delayed(const Duration(milliseconds: 200));
-
-        // 2.3 Load Soon Booking & Ads
-        if (mounted) getIt<HomeCubit>().loadSoon();
-        await Future.delayed(const Duration(milliseconds: 200));
-        if (mounted) getIt<AdsCubit>().getAds();
-        await Future.delayed(const Duration(milliseconds: 200));
-
-        // 2.4 Load Online Status
-        if (mounted) getIt<HomeCubit>().getInitialOnlineStatus();
-
-        // 2.5 Load Notifications
-        if (mounted) getIt<NotificationsCubit>().loadNotifications();
+        // Priority 2: Secondary data (Ads & Notifications) after Pusher & Home are settled
+        await Future.delayed(const Duration(milliseconds: 700));
+        if (!mounted) return;
+        debugPrint('🏠 [HOME LAYOUT] Loading secondary data (Ads & Notifications)...');
+        getIt<AdsCubit>().getAds();
+        getIt<NotificationsCubit>().loadNotifications();
       });
     });
   }
@@ -112,6 +99,8 @@ class _HomeLayoutState extends State<HomeLayout> {
           buildWhen: (_, curr) => curr is HomeChangeBottomNavState,
           builder: (context, _) {
             final cubit = context.read<HomeCubit>();
+            _visitedTabs.add(cubit.currentIndex);
+
             return Stack(
               children: [
                 Scaffold(
@@ -119,23 +108,24 @@ class _HomeLayoutState extends State<HomeLayout> {
                   drawer: const CustomDrawer(),
                   body: IndexedStack(
                     index: cubit.currentIndex,
-                    children: _kScreens,
+                    children: [
+                      const RepaintBoundary(child: HomeScreen()), // 0 — الرئيسية
+                      _visitedTabs.contains(1)
+                          ? const RepaintBoundary(child: ScheduleScreen()) // 1 — جدولي
+                          : const SizedBox.shrink(),
+                      _visitedTabs.contains(2)
+                          ? const RepaintBoundary(child: BookingsScreen()) // 2 — جلساتي
+                          : const SizedBox.shrink(),
+                      _visitedTabs.contains(3)
+                          ? const RepaintBoundary(child: RatingsScreen()) // 3 — المقرأة
+                          : const SizedBox.shrink(),
+                      _visitedTabs.contains(4)
+                          ? const RepaintBoundary(child: WalletScreen()) // 4 — المحفظة
+                          : const SizedBox.shrink(),
+                    ],
                   ),
                   bottomNavigationBar: _BottomNav(cubit: cubit),
                 ),
-                // DraggableFloatingButton(
-                //   key: const ValueKey('draggable_fab'),
-                //   initialOffset: const Offset(30, 80),
-                //   onPressed: () {
-                //     Navigator.push(
-                //       context,
-                //       MaterialPageRoute(
-                //         builder: (context) => const AiChatScreen(),
-                //       ),
-                //     );
-                //   },
-                //   child: const _FabContent(),
-                // ),
               ],
             );
           },

@@ -43,8 +43,8 @@ class BookingsApi {
     return CancelSlotResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
-  Future<SoonResponse> getSoon() async {
-    final response = await _dio.get(ApiConstants.teacherSoon);
-    return SoonResponse.fromJson(response.data as Map<String, dynamic>);
-  }
+  // Future<SoonResponse> getSoon() async {
+  //   final response = await _dio.get(ApiConstants.teacherSoon);
+  //   return SoonResponse.fromJson(response.data as Map<String, dynamic>);
+  // }
 }

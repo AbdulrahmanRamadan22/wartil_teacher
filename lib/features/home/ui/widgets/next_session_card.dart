@@ -71,7 +71,10 @@ class _NextSessionCardState extends State<NextSessionCard> {
 
         final booking = context.read<HomeCubit>().soonBooking;
 
-        if (booking == null) {
+        if (booking == null ||
+            booking.bookingStatus.toLowerCase() == 'completed' ||
+            booking.bookingStatus.toLowerCase() == 'cancelled' ||
+            booking.isPast) {
           return const SizedBox.shrink();
         }
 

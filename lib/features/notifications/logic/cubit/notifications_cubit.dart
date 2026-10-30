@@ -6,9 +6,7 @@ import 'notifications_state.dart';
 class NotificationsCubit extends Cubit<NotificationsState> {
   final NotificationsRepo _repo;
 
-  NotificationsCubit(this._repo) : super(NotificationsInitial()) {
-    loadNotifications();
-  }
+  NotificationsCubit(this._repo) : super(NotificationsInitial());
 
   int unreadCount = 0;
 

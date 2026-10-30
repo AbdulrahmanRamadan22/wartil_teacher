@@ -7,9 +7,7 @@ import 'package:waratel_app/features/bookings/logic/cubit/bookings_state.dart';
 class BookingsCubit extends Cubit<BookingsState> {
   final IBookingsRepo _repo;
 
-  BookingsCubit(this._repo) : super(BookingsInitial()) {
-    loadBookings();
-  }
+  BookingsCubit(this._repo) : super(BookingsInitial());
 
   List<BookingModel> _upcomingBookings = [];
   List<BookingModel> _historyBookings = [];

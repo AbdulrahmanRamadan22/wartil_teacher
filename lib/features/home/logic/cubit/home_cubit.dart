@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:waratel_app/core/di/dependency_injection.dart';
-import 'package:waratel_app/features/bookings/domain/repos/i_bookings_repo.dart';
+
 import 'package:waratel_app/features/home/data/repos/home_repo.dart';
 import 'package:waratel_app/features/home/logic/cubit/home_state.dart';
 import 'package:waratel_app/features/bookings/data/models/booking_model.dart'; // Contains BookingModel & SoonResponse
@@ -60,37 +59,16 @@ class HomeCubit extends Cubit<HomeState> {
     if (isClosed) return;
     if (!isClosed) emit(HomeSoonLoading());
 
-    // Fire background loads (not awaited)
-    _safeBackground(getAverageRating);
-    _safeBackground(loadRecentCalls);
+    // Defer non-critical background loads so they don't compete with the upcoming booking query
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (!isClosed) {
+        _safeBackground(getAverageRating);
+        _safeBackground(loadRecentCalls);
+      }
+    });
 
     try {
-      // 1. First fetch upcoming bookings from IBookingsRepo
-      // This is the direct source of truth and contains the true booking_id!
-      try {
-        final bookingsRes = await getIt<IBookingsRepo>().getBookings();
-        if (bookingsRes.status && bookingsRes.upcoming.isNotEmpty) {
-          final now = DateTime.now();
-          // تصفية الجلسات التي لم ينته وقتها بعد
-          final activeUpcoming = bookingsRes.upcoming
-              .where((b) => b.endDateTime.isAfter(now))
-              .toList();
-
-          if (activeUpcoming.isNotEmpty) {
-            // ترتيب تصاعدي: الأقرب بدءاً يظهر أولاً
-            activeUpcoming.sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
-            soonBooking = activeUpcoming.first;
-            debugPrint(
-                '✅ [HOME CUBIT] Nearest session selected: booking_id=${soonBooking!.bookingId}, slot_id=${soonBooking!.slotId}, date=${soonBooking!.date}, time=${soonBooking!.startTime}');
-            if (!isClosed) emit(HomeSoonLoaded(soonBooking));
-            return;
-          }
-        }
-      } catch (e) {
-        debugPrint('⚠️ [HOME CUBIT] Bookings lookup error for soon: $e');
-      }
-
-      // 2. Fallback to teacher/soon if bookings list had no upcoming
+      // Direct call to teacher/soon endpoint (fast and lightweight)
       final response = await _homeRepo.getSoon();
 
       if (response == null) {
@@ -99,7 +77,7 @@ class HomeCubit extends Cubit<HomeState> {
         return;
       }
 
-      // Parse using the correct SoonResponse model
+      // Parse using SoonResponse model
       final soonResponse = SoonResponse.fromJson(
           response is Map<String, dynamic> ? response : {});
 
@@ -111,15 +89,20 @@ class HomeCubit extends Cubit<HomeState> {
         return;
       }
 
-      // If the session has already ended, hide it — do NOT cancel it.
+      // If the session is completed, cancelled, past, or time has elapsed, hide it from Home
       final now = DateTime.now();
-      if (now.isAfter(booking.endDateTime)) {
+      if (booking.bookingStatus.toLowerCase() == 'completed' ||
+          booking.bookingStatus.toLowerCase() == 'cancelled' ||
+          booking.isPast ||
+          now.isAfter(booking.endDateTime)) {
         soonBooking = null;
         if (!isClosed) emit(HomeSoonLoaded(null));
         return;
       }
 
       soonBooking = booking;
+      debugPrint(
+          '✅ [HOME CUBIT] Soon session loaded from /teacher/soon: booking_id=${soonBooking!.bookingId}, slot_id=${soonBooking!.slotId}, date=${soonBooking!.date}, time=${soonBooking!.startTime}, can_start=${soonBooking!.callDetails?.canStart}');
       if (!isClosed) emit(HomeSoonLoaded(soonBooking));
     } catch (e) {
       debugPrint('❌ [HOME CUBIT] Error loading soon booking: $e');
