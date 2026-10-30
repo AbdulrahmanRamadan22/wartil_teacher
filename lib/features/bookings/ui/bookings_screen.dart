@@ -31,8 +31,15 @@ class BookingsScreen extends StatelessWidget {
               'studentName': state.studentName,
               'callId': state.callId,
               'studentId': state.studentId,
+              'hasPreloadedToken': true, // Token من /bookings/start — لا نحتاج /join
+              'reportableType': 'slot',
+              'reportableId': state.slotId ?? state.callId,
             },
-          );
+          ).then((_) {
+            if (context.mounted) {
+              context.read<BookingsCubit>().loadBookings();
+            }
+          });
         } else if (state is StartCallError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(state.error), backgroundColor: Colors.red),
@@ -254,11 +261,21 @@ class _BookingCard extends StatelessWidget {
                   if (booking.canStart)
                     ElevatedButton(
                       onPressed: () {
+                        final int bookingId = booking.bookingId ?? 0;
+                        if (bookingId <= 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('تعذر العثور على معرف الحجز'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
                         context.read<BookingsCubit>().startCall(
-                              booking.slotId,
-                              booking.callDetails?.id ?? 0,
+                              bookingId,
                               booking.student.name,
                               studentId: booking.student.id,
+                              slotId: booking.slotId,
                             );
                       },
                       style: ElevatedButton.styleFrom(

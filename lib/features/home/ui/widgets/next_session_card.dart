@@ -7,7 +7,8 @@ import 'package:waratel_app/features/localization/data/app_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../logic/cubit/home_cubit.dart';
 import '../../logic/cubit/home_state.dart';
-// Removed unused import
+import 'package:waratel_app/core/di/dependency_injection.dart';
+import 'package:waratel_app/features/bookings/domain/repos/i_bookings_repo.dart';
 import 'package:waratel_app/features/bookings/logic/cubit/bookings_cubit.dart';
 import 'package:waratel_app/features/bookings/logic/cubit/bookings_state.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -209,9 +210,6 @@ class _NextSessionCardState extends State<NextSessionCard> {
                     BlocConsumer<BookingsCubit, BookingsState>(
                       listener: (context, state) {
                         if (state is StartCallSuccess) {
-                          // Refresh home data immediately so the card disappears or status changes
-                          context.read<HomeCubit>().loadSoon();
-
                           Navigator.pushNamed(
                             context,
                             Routes.call,
@@ -222,20 +220,56 @@ class _NextSessionCardState extends State<NextSessionCard> {
                               'studentName': state.studentName,
                               'callId': state.callId,
                               'studentId': state.studentId,
+                              'hasPreloadedToken': true, // من /bookings/start
+                              'reportableType': 'slot',
+                              'reportableId': state.slotId ?? booking.slotId,
                             },
-                          );
+                          ).then((_) {
+                            // تحديث بيانات الجلسات فقط بعد انتهاء المكالمة والرجوع للرئيسية
+                            if (context.mounted) {
+                              context.read<HomeCubit>().loadSoon();
+                            }
+                          });
                         }
                       },
                       builder: (context, state) {
                         return _EnterButton(
                           isLoading: state is StartCallLoading,
-                          onPressed: () {
-                            context.read<BookingsCubit>().startCall(
-                                  booking.slotId,
-                                  booking.callDetails?.id ?? 0,
-                                  booking.student.name,
-                                  studentId: booking.student.id,
-                                );
+                          onPressed: () async {
+                            int? bId = booking.bookingId;
+                            if (bId == null || bId <= 0) {
+                              try {
+                                final res =
+                                    await getIt<IBookingsRepo>().getBookings();
+                                for (final item in res.upcoming) {
+                                  if (item.slotId == booking.slotId &&
+                                      item.bookingId != null &&
+                                      item.bookingId! > 0) {
+                                    bId = item.bookingId;
+                                    break;
+                                  }
+                                }
+                                if (bId == null && res.upcoming.isNotEmpty) {
+                                  bId = res.upcoming.first.bookingId;
+                                }
+                              } catch (_) {}
+                            }
+
+                            final int finalBookingId = bId ?? 0;
+                            if (finalBookingId <= 0) {
+                              debugPrint(
+                                  '❌ [NEXT SESSION] Could not resolve booking_id');
+                              return;
+                            }
+
+                            if (context.mounted) {
+                              context.read<BookingsCubit>().startCall(
+                                    finalBookingId,
+                                    booking.student.name,
+                                    studentId: booking.student.id,
+                                    slotId: booking.slotId,
+                                  );
+                            }
                           },
                         );
                       },

@@ -15,15 +15,24 @@ class BookingsApi {
     return BookingsResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
-  Future<StartCallResponse> startBooking(int slotId, int callSessionId) async {
+  Future<StartCallResponse> startBooking(int bookingId) async {
     final response = await _dio.post(
       ApiConstants.teacherBookingsStart,
       data: {
-        'slot_id': slotId,
-        'call_session_id': callSessionId,
+        'call_session_id': bookingId,
       },
     );
     return StartCallResponse.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<dynamic> endBooking(int bookingId) async {
+    final response = await _dio.post(
+      ApiConstants.teacherBookingsEnd,
+      data: {
+        'call_session_id': bookingId,
+      },
+    );
+    return response.data;
   }
 
   Future<CancelSlotResponse> cancelSlot(int slotId) async {

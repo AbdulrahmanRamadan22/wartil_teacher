@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:waratel_app/features/bookings/domain/repos/i_bookings_repo.dart';
 import 'package:waratel_app/features/bookings/data/models/booking_model.dart';
@@ -55,18 +56,35 @@ class BookingsCubit extends Cubit<BookingsState> {
     }
   }
 
-  Future<void> startCall(int slotId, int callSessionId, String studentName, {int? studentId}) async {
+  Future<void> startCall(
+    int bookingId,
+    String studentName, {
+    int? studentId,
+    int? slotId,
+  }) async {
+    if (bookingId <= 0) {
+      emit(StartCallError('معرف الحجز غير صالح'));
+      return;
+    }
     emit(StartCallLoading());
     try {
-      final response = await _repo.startBooking(slotId, callSessionId);
+      debugPrint(
+          '🚀 [BOOKINGS CUBIT] Starting booking call with booking_id: $bookingId');
+      final response = await _repo.startBooking(bookingId);
       if (response.status) {
+        final int effectiveCallId =
+            (response.callId != null && response.callId! > 0)
+                ? response.callId!
+                : bookingId;
+
         emit(StartCallSuccess(
           token: response.token,
           channel: response.channel,
           uid: response.uid,
           studentName: studentName,
-          callId: callSessionId > 0 ? callSessionId : slotId, // Use slotId as fallback callId
+          callId: effectiveCallId,
           studentId: studentId,
+          slotId: slotId,
         ));
       } else {
         emit(StartCallError('فشل بدء المكالمة'));

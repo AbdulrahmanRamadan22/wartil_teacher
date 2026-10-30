@@ -111,8 +111,8 @@ Future<void> setupGetIt() async {
   getIt.registerFactory<AchievementPlanCubit>(() => AchievementPlanCubit());
   getIt.registerLazySingleton<NotificationsCubit>(
       () => NotificationsCubit(getIt<NotificationsRepo>()));
-  getIt.registerFactory<CallCubit>(
-      () => CallCubit(getIt<AgoraService>(), getIt<CallsRepo>()));
+  getIt.registerFactory<CallCubit>(() => CallCubit(
+      getIt<AgoraService>(), getIt<CallsRepo>(), getIt<IBookingsRepo>()));
   getIt.registerLazySingleton<ProfileCubit>(
       () => ProfileCubit(getIt<ProfileRepo>()));
   getIt.registerFactory<RatingsCubit>(() => RatingsCubit(

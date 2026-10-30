@@ -43,6 +43,8 @@ class StartCallSuccess extends BookingsState {
   final String studentName;
   final int callId;
   final int? studentId;
+  final int? slotId;
+
   StartCallSuccess({
     required this.token,
     required this.channel,
@@ -50,6 +52,7 @@ class StartCallSuccess extends BookingsState {
     required this.studentName,
     required this.callId,
     this.studentId,
+    this.slotId,
   });
 }
 

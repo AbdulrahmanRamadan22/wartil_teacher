@@ -386,40 +386,98 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
   }
 
   void _saveAndEnd() async {
-    final statusStr = isPresent ? 'completed'.tr(context) : 'absent'.tr(context);
-    final ratingStr = isPresent ? selectedRating.tr(context) : 'absent'.tr(context);
+    // ── 0. التقط جميع البيانات المعتمدة على context قبل أي async ─────────────
+    if (!mounted) return;
+    final statusStr =
+        isPresent ? 'completed'.tr(context) : 'absent'.tr(context);
+    final ratingStr =
+        isPresent ? selectedRating.tr(context) : 'absent'.tr(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
-    setState(() => isSubmitting = true);
+    if (mounted) setState(() => isSubmitting = true);
 
     final now = DateTime.now();
-
-    // 1. Prepare Backend Report Request
     final int repId = widget.reportableId ?? widget.sessionId ?? 0;
-    final int sId = widget.studentId ?? 0;
+    int sId = widget.studentId ?? 0;
 
-    final request = StudentReportRequest(
-      studentId: sId,
-      reportableType: widget.reportableType,
-      reportableId: repId,
-      attendanceStatus: isPresent ? 'present' : 'absent',
-      receptionLevel: isPresent ? selectedRating : null,
-      notes: notesController.text.trim().isNotEmpty
-          ? notesController.text.trim()
-          : null,
-      sessionContent: isPresent && nextAssignmentController.text.trim().isNotEmpty
-          ? nextAssignmentController.text.trim()
-          : null,
-    );
-
-    try {
-      if (sId > 0 && repId > 0) {
-        await getIt<CallsRepo>().submitReport(request.toJson());
+    // ── 1. Submit report to backend ──────────────────────────────────────────
+    if (repId > 0) {
+      // If studentId wasn't passed directly, fetch it from call details
+      if (sId <= 0 && widget.reportableType == 'call') {
+        try {
+          final detail = await getIt<CallsRepo>().getCallDetail(repId);
+          if (detail.status && detail.data.student.id > 0) {
+            sId = detail.data.student.id;
+            debugPrint('ℹ️ [REPORT] Retrieved student_id from call details: $sId');
+          }
+        } catch (e) {
+          debugPrint('⚠️ [REPORT] Could not fetch call details for student_id: $e');
+        }
       }
-    } catch (e) {
-      debugPrint('⚠️ Error submitting report to backend: $e');
+
+      final request = StudentReportRequest(
+        studentId: sId,
+        reportableType: widget.reportableType,
+        reportableId: repId,
+        attendanceStatus: isPresent ? 'present' : 'absent',
+        receptionLevel: isPresent ? selectedRating : null,
+        notes: notesController.text.trim().isNotEmpty
+            ? notesController.text.trim()
+            : null,
+        sessionContent:
+            isPresent && nextAssignmentController.text.trim().isNotEmpty
+                ? nextAssignmentController.text.trim()
+                : null,
+      );
+
+      try {
+        debugPrint(
+            '📤 [REPORT] Submitting → type=${widget.reportableType} '
+            'reportable_id=$repId student_id=$sId '
+            'attendance=${isPresent ? "present" : "absent"} '
+            'level=${isPresent ? selectedRating : "-"}');
+
+        await getIt<CallsRepo>().submitReport(request.toJson());
+
+        debugPrint('✅ [REPORT] Submitted successfully');
+      } catch (e) {
+        debugPrint('❌ [REPORT] Failed: $e');
+
+        if (mounted) {
+          setState(() => isSubmitting = false);
+          scaffoldMessenger.showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: Text(
+                      'فشل إرسال تقرير الجلسة: ${e.toString().replaceFirst("Exception: ", "")}',
+                      style: TextStyle(fontSize: 13.sp),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.red.shade700,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: 'إعادة المحاولة',
+                textColor: Colors.white,
+                onPressed: _saveAndEnd,
+              ),
+            ),
+          );
+        }
+        return; // Keep dialog open so teacher can retry
+      }
+    } else {
+      debugPrint(
+          '⚠️ [REPORT] Skipped API call — repId=$repId (no valid reportable ID)');
     }
 
-    // 2. Save to Local RecordCubit for session history
+    // ── 2. Save locally for session history ──────────────────────────────────
     final session = SessionModel(
       studentName: widget.studentName,
       date: DateFormat('yyyy-MM-dd').format(now),
@@ -432,15 +490,13 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
       rating: ratingStr,
       isPresent: isPresent,
     );
-
     getIt<RecordCubit>().addSession(session);
 
-    // 3. Refresh Providers
+    // ── 3. Refresh providers ──────────────────────────────────────────────────
     getIt<HomeCubit>().loadSoon();
     getIt<BookingsCubit>().loadBookings();
     getIt<ScheduleCubit>().loadSchedule();
-
-    final newReview = CallModel(
+    getIt<HomeCubit>().addCall(CallModel(
       id: 0,
       studentName: widget.studentName,
       status: 'ended',
@@ -448,14 +504,11 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
       date: DateFormat('yyyy-MM-dd').format(now),
       time: DateFormat.jm().format(now),
       rating: 5,
-    );
-    getIt<HomeCubit>().addCall(newReview);
+    ));
 
-    if (mounted) {
-      setState(() => isSubmitting = false);
-    }
+    if (mounted) setState(() => isSubmitting = false);
 
-    // Close Dialog and Call Screen
+    // ── 4. Close dialog ───────────────────────────────────────────────────────
     if (widget.onSuccess != null) {
       widget.onSuccess!();
     } else {
@@ -573,3 +626,11 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
     );
   }
 }
+
+
+
+
+
+
+
+

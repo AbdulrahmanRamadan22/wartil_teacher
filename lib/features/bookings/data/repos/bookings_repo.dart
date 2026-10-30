@@ -14,8 +14,13 @@ class BookingsRepo extends BaseRepository implements IBookingsRepo {
   }
 
   @override
-  Future<StartCallResponse> startBooking(int slotId, int callSessionId) async {
-    return handleApiCall(() => _api.startBooking(slotId, callSessionId));
+  Future<StartCallResponse> startBooking(int bookingId) async {
+    return handleApiCall(() => _api.startBooking(bookingId));
+  }
+
+  @override
+  Future<dynamic> endBooking(int bookingId) async {
+    return handleApiCall(() => _api.endBooking(bookingId));
   }
 
   @override

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:waratel_app/core/call/call_keepalive_service.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:waratel_app/core/di/dependency_injection.dart';
 import 'package:waratel_app/core/routing/routers.dart';
@@ -91,6 +92,8 @@ class _HomeLayoutState extends State<HomeLayout> {
       child: BlocListener<ProfileCubit, ProfileState>(
         listener: (context, state) {
           if (state is LogoutSuccess) {
+            // إيقاف خدمة الخلفية عند تسجيل الخروج
+            CallKeepaliveService.stop();
             Navigator.pushNamedAndRemoveUntil(
               context,
               Routes.login,
@@ -210,22 +213,3 @@ class _BottomNav extends StatelessWidget {
   }
 }
 
-class _FabContent extends StatelessWidget {
-  const _FabContent();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 48.w,
-      height: 48.w,
-      decoration: const BoxDecoration(
-        gradient: ColorsManager.accentGradient,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3)),
-        ],
-      ),
-      child: Icon(Icons.auto_awesome, color: Colors.white, size: 24.sp),
-    );
-  }
-}

@@ -5,7 +5,10 @@ import 'package:waratel_app/core/cache/shared_preferences.dart';
 import 'package:waratel_app/core/di/dependency_injection.dart';
 import 'package:waratel_app/core/routing/routers.dart';
 import 'package:waratel_app/core/call/call_api_service.dart';
+import 'package:waratel_app/core/call/call_keepalive_service.dart';
 import 'package:waratel_app/features/notifications/logic/cubit/notifications_cubit.dart';
+import 'package:waratel_app/features/bookings/logic/cubit/bookings_cubit.dart';
+import 'package:waratel_app/features/home/logic/cubit/home_cubit.dart';
 import 'package:waratel_app/core/notifications/local_notification_service.dart';
 import 'package:flutter_callkit_incoming/entities/call_event.dart';
 import 'package:pusher_channels_flutter/pusher_channels_flutter.dart';
@@ -119,6 +122,9 @@ class CallService {
       _isInitialized = true;
       _currentTeacherId = teacherId;
       debugPrint('✅ [PUSHER] Pusher setup completed successfully');
+
+      // ── بدء Foreground Service لإبقاء الـ WebSocket حياً في الخلفية ──
+      await CallKeepaliveService.start();
     } catch (e) {
       _isInitialized = false;
       debugPrint('❌ [PUSHER SETUP FAILED] $e');
@@ -250,13 +256,19 @@ class CallService {
           return;
         }
 
+        final String studentIdStr =
+            (callData['student_id'] ?? callData['caller_id'] ?? callData['user_id'] ?? '')
+                .toString();
+        final int? studentId = int.tryParse(studentIdStr);
+
         debugPrint(
-            '📞 [PUSHER] جاري إظهار شاشة الرنين: callId=$callId, student=$studentName, channel=$channelName');
+            '📞 [PUSHER] جاري إظهار شاشة الرنين: callId=$callId, student=$studentName, channel=$channelName, studentId=$studentId');
 
         await _showIncomingCall(
           callId: callId,
           studentName: studentName,
           channelName: channelName,
+          studentId: studentId,
         );
       } catch (e) {
         debugPrint('❌ [PUSHER] فشل فك تشفير بيانات الحدث: $e');
@@ -285,6 +297,35 @@ class CallService {
       } catch (e) {
         debugPrint('❌ [PUSHER] فشل فك إشعار الإدارة: $e');
       }
+    } else if (name.contains('StudentJoined') || nameLower.contains('studentjoined')) {
+      debugPrint('🎓 [PUSHER] ✅ انضمام طالب للجلسة المجدولة! (حدث: "$name")');
+      try {
+        final Map<String, dynamic> eventData = data ??
+            ((rawData is String)
+                ? jsonDecode(rawData) as Map<String, dynamic>
+                : rawData as Map<String, dynamic>);
+
+        final callDetails =
+            eventData['call_details'] as Map<String, dynamic>?;
+        final studentName =
+            callDetails?['student_name']?.toString() ?? 'طالب';
+
+        // تحديث الحجوزات والشاشة الرئيسية
+        try {
+          getIt<BookingsCubit>().loadBookings();
+          getIt<HomeCubit>().loadSoon();
+        } catch (_) {}
+
+        // إشعار محلي للمعلم
+        LocalNotificationService.showNotification(
+          id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+          title: 'انضمام طالب للجلسة المجدولة',
+          body: 'الطالب $studentName انضم وبانتظارك لبدء الجلسة',
+          payload: jsonEncode(eventData),
+        );
+      } catch (e) {
+        debugPrint('⚠️ [PUSHER] خطأ معالجة حدث StudentJoined: $e');
+      }
     } else {
       debugPrint('ℹ️ [PUSHER] حدث غير معروف تم تجاهله: "$name"');
     }
@@ -295,6 +336,7 @@ class CallService {
     required String callId,
     required String studentName,
     required String channelName,
+    int? studentId,
   }) async {
     final params = CallKitParams(
       id: callId,
@@ -314,6 +356,7 @@ class CallService {
       extra: <String, dynamic>{
         'channel_name': channelName,
         'call_id': callId,
+        if (studentId != null && studentId > 0) 'student_id': studentId,
       },
       android: const AndroidParams(
         isCustomNotification: false,
@@ -346,13 +389,15 @@ class CallService {
           final String callId = callKitParams.id;
           final String studentName = callKitParams.nameCaller ?? '';
           final String channelName = (callKitParams.extra?['channel_name'] ?? '').toString();
+          final int studentId = int.tryParse((callKitParams.extra?['student_id'] ?? '').toString()) ?? 0;
 
           debugPrint(
-              '✅ [CALLKIT] قبول المكالمة: $callId | الطالب: $studentName | قناة: $channelName');
+              '✅ [CALLKIT] قبول المكالمة: $callId | الطالب: $studentName | قناة: $channelName | studentId: $studentId');
           await _handleAccept(
             callId: callId,
             channelName: channelName,
             studentName: studentName,
+            studentId: studentId,
             api: api,
           );
           break;
@@ -385,6 +430,7 @@ class CallService {
     required String callId,
     required String channelName,
     required String studentName,
+    int? studentId,
     required CallApiService api,
   }) async {
     final int id = int.tryParse(callId) ?? 0;
@@ -425,12 +471,16 @@ class CallService {
         'uid': joinData.uid,
         'studentName': studentName,
         'callId': id,
+        'studentId': studentId,
       },
     );
   }
 
   // ───────────────── 6. قطع الاتصال عند الخروج ────────────
   Future<void> dispose() async {
+    // ── إيقاف Foreground Service ──
+    await CallKeepaliveService.stop();
+
     try {
       final pusher = await _pusher;
       await pusher.disconnect().timeout(

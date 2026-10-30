@@ -58,6 +58,12 @@ class AppRouter {
             studentId: args['studentId'] is int
                 ? args['studentId']
                 : int.tryParse(args['studentId']?.toString() ?? ''),
+            hasPreloadedToken: args['hasPreloadedToken'] == true,
+            reportableType: args['reportableType']?.toString() ??
+                (args['hasPreloadedToken'] == true ? 'slot' : 'call'),
+            reportableId: args['reportableId'] is int
+                ? args['reportableId']
+                : int.tryParse(args['reportableId']?.toString() ?? ''),
           ),
         );
 

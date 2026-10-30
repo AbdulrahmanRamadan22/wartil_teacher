@@ -19,6 +19,11 @@ class CallScreen extends StatefulWidget {
   final String studentName;
   final int? callId;
   final int? studentId;
+  /// إذا كان true، نستخدم startWithToken بدلاً من joinAndStartCall
+  /// لأن token جاهز من /bookings/start ولا نحتاج /join
+  final bool hasPreloadedToken;
+  final String reportableType;
+  final int? reportableId;
 
   const CallScreen({
     super.key,
@@ -28,6 +33,9 @@ class CallScreen extends StatefulWidget {
     this.studentName = '',
     this.callId,
     this.studentId,
+    this.hasPreloadedToken = false,
+    this.reportableType = 'call',
+    this.reportableId,
   });
 
   @override
@@ -53,6 +61,18 @@ class _CallScreenState extends State<CallScreen> {
 
     if (!mounted) return;
 
+    final int effectiveStudentId =
+        (widget.studentId != null && widget.studentId! > 0)
+            ? widget.studentId!
+            : (cubit.studentId ?? 0);
+
+    final String effectiveReportableType = widget.reportableType.isNotEmpty
+        ? widget.reportableType
+        : (widget.hasPreloadedToken ? 'slot' : 'call');
+
+    final int effectiveReportableId =
+        widget.reportableId ?? widget.callId ?? 0;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -65,9 +85,9 @@ class _CallScreenState extends State<CallScreen> {
         startTime: _callStartTime,
         duration: cubit.currentDurationString,
         sessionId: widget.callId,
-        studentId: widget.studentId,
-        reportableType: 'call',
-        reportableId: widget.callId,
+        studentId: effectiveStudentId,
+        reportableType: effectiveReportableType,
+        reportableId: effectiveReportableId,
         initialIsPresent: true,
         isAttendanceLocked: true,
         onSuccess: () {
@@ -83,8 +103,26 @@ class _CallScreenState extends State<CallScreen> {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) =>
-          getIt<CallCubit>()..joinAndStartCall(widget.callId ?? 0),
+      create: (context) {
+        final cubit = getIt<CallCubit>();
+        if (widget.hasPreloadedToken) {
+          // تدفق الحجز: Token جاهز من /bookings/start — لا نستدعي /join
+          cubit.startWithToken(
+            token: widget.token,
+            channelName: widget.channelName,
+            uid: widget.uid,
+            callId: widget.callId ?? 0,
+            studentId: widget.studentId,
+          );
+        } else {
+          // تدفق المكالمة المباشرة: نستدعي /join للحصول على Token
+          cubit.joinAndStartCall(
+            widget.callId ?? 0,
+            studentId: widget.studentId,
+          );
+        }
+        return cubit;
+      },
       child: BlocConsumer<CallCubit, CallState>(
         listener: (context, state) {
           if (state is CallError) {
@@ -301,32 +339,7 @@ class _CallScreenState extends State<CallScreen> {
           ),
           _controlCircle(
             icon: Icons.call_end,
-            onTap: () {
-              // إنهاء المكالمة فوراً
-              cubit.endCall();
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => SessionReportDialog(
-                  studentName: widget.studentName.isEmpty
-                      ? 'student'.tr(context)
-                      : widget.studentName,
-                  trackName: 'memorization_track'.tr(context),
-                  startTime: _callStartTime,
-                  duration: cubit.currentDurationString,
-                  sessionId: widget.callId,
-                  studentId: widget.studentId,
-                  reportableType: 'call',
-                  reportableId: widget.callId,
-                  initialIsPresent: true,
-                  isAttendanceLocked: true,
-                  onSuccess: () {
-                    Navigator.pop(context); // Close dialog
-                    Navigator.pop(context); // Close CallScreen
-                  },
-                ),
-              );
-            },
+            onTap: () => _showReportDialog(context, cubit),
             color: Colors.red,
             size: 65.r,
           ),

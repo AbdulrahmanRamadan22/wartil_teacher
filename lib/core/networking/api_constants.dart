@@ -49,6 +49,7 @@ class ApiConstants {
   // Bookings Endpoints
   static const String teacherBookings = 'teacher/bookings';
   static const String teacherBookingsStart = 'teacher/bookings/start';
+  static const String teacherBookingsEnd = 'teacher/bookings/end';
   static const String teacherSlotsCancel = 'teacher/slots/cancel';
   static const String teacherSoon = 'teacher/soon';
   static const String teacherRatings = 'teacher/ratings';

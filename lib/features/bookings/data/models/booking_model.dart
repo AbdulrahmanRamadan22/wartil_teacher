@@ -80,13 +80,39 @@ class BookingModel {
   });
 
   factory BookingModel.fromJson(Map<String, dynamic> json) {
+    final int parsedSlotId = (json['slot_id'] is int)
+        ? json['slot_id']
+        : int.tryParse(json['slot_id']?.toString() ?? '') ??
+            (json['id'] is int
+                ? json['id']
+                : int.tryParse(json['id']?.toString() ?? '') ?? 0);
+
+    final int? rawBookingId = (json['booking_id'] != null)
+        ? (json['booking_id'] is int
+            ? json['booking_id']
+            : int.tryParse(json['booking_id'].toString()))
+        : (json['booking'] != null &&
+                json['booking'] is Map &&
+                json['booking']['id'] != null
+            ? (json['booking']['id'] is int
+                ? json['booking']['id']
+                : int.tryParse(json['booking']['id'].toString()))
+            : null);
+
+    // If booking_id wasn't provided, only use json['id'] if it's explicitly different from slot_id
+    int? finalBookingId = rawBookingId;
+    if (finalBookingId == null && json['id'] != null && json['slot_id'] != null) {
+      final int possibleId = (json['id'] is int)
+          ? json['id']
+          : int.tryParse(json['id'].toString()) ?? 0;
+      if (possibleId > 0 && possibleId != parsedSlotId) {
+        finalBookingId = possibleId;
+      }
+    }
+
     return BookingModel(
-      bookingId: (json['booking_id'] != null)
-          ? (json['booking_id'] is int ? json['booking_id'] : int.tryParse(json['booking_id'].toString()))
-          : (json['id'] != null ? (json['id'] is int ? json['id'] : int.tryParse(json['id'].toString())) : null),
-      slotId: (json['slot_id'] is int)
-          ? json['slot_id']
-          : int.tryParse(json['slot_id'].toString()) ?? 0,
+      bookingId: finalBookingId,
+      slotId: parsedSlotId,
       date: (json['date'] ?? '').toString(),
       startTime: (json['start_time'] ?? '').toString(),
       endTime: (json['end_time'] ?? '').toString(),
@@ -111,17 +137,31 @@ class BookingModel {
 
   DateTime get startDateTime {
     try {
-      return DateTime.parse('$date $startTime');
+      final d = date.trim();
+      final t = startTime.trim();
+      if (d.isEmpty) return DateTime(2100);
+      return DateTime.parse(t.isEmpty ? d : '$d $t');
     } catch (_) {
-      return DateTime.now();
+      try {
+        return DateTime.parse(date.trim());
+      } catch (_) {
+        return DateTime(2100);
+      }
     }
   }
 
   DateTime get endDateTime {
     try {
-      return DateTime.parse('$date $endTime');
+      final d = date.trim();
+      final t = endTime.trim();
+      if (d.isEmpty) return DateTime(1970);
+      return DateTime.parse(t.isEmpty ? d : '$d $t');
     } catch (_) {
-      return DateTime.now();
+      try {
+        return DateTime.parse(date.trim());
+      } catch (_) {
+        return DateTime(1970);
+      }
     }
   }
 
@@ -223,6 +263,12 @@ class BookingsResponse {
         upcoming = upcoming.where((b) => b.endDateTime.isAfter(now)).toList();
         history = [...expiredUpcoming, ...history];
       }
+
+      // ── ترتيب الحجوزات القادمة تصاعدياً: الأقرب موعداً أولاً ──
+      upcoming.sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
+
+      // ── ترتيب الأرشيف تنازلياً: الأحدث أولاً ──
+      history.sort((a, b) => b.startDateTime.compareTo(a.startDateTime));
     }
 
     return BookingsResponse(
@@ -257,6 +303,7 @@ class StartCallResponse {
   final String channel;
   final int uid;
   final bool isRecording;
+  final int? callId;
 
   const StartCallResponse({
     required this.status,
@@ -264,18 +311,22 @@ class StartCallResponse {
     required this.channel,
     required this.uid,
     required this.isRecording,
+    this.callId,
   });
 
   factory StartCallResponse.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] ?? {};
+    final data = (json['data'] is Map<String, dynamic>) ? json['data'] : json;
+    final dynamic cId =
+        data['call_id'] ?? data['id'] ?? data['call_session_id'];
     return StartCallResponse(
       status: json['status'] == true,
-      token: (data['token'] ?? '').toString(),
-      channel: (data['channel'] ?? '').toString(),
+      token: (data['token'] ?? data['agora_token'] ?? '').toString(),
+      channel: (data['channel'] ?? data['channel_name'] ?? '').toString(),
       uid: (data['uid'] is int)
           ? data['uid']
-          : int.tryParse(data['uid'].toString()) ?? 0,
+          : int.tryParse(data['uid']?.toString() ?? '') ?? 0,
       isRecording: data['is_recording'] == true,
+      callId: (cId is int) ? cId : int.tryParse(cId?.toString() ?? ''),
     );
   }
 }

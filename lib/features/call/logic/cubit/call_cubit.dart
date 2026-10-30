@@ -4,14 +4,20 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/agora/agora_service.dart';
 import '../../../../core/call/call_service.dart';
+import 'package:waratel_app/features/bookings/domain/repos/i_bookings_repo.dart';
 import '../../data/repos/calls_repo.dart';
 import 'call_state.dart';
 
 class CallCubit extends Cubit<CallState> {
   final AgoraService _agoraService;
   final CallsRepo _callsRepo;
+  final IBookingsRepo _bookingsRepo;
 
-  CallCubit(this._agoraService, this._callsRepo) : super(CallInitial());
+  CallCubit(
+    this._agoraService,
+    this._callsRepo,
+    this._bookingsRepo,
+  ) : super(CallInitial());
 
   bool isMicOn = true;
   bool isCamOn = false; // ← مغلقة افتراضياً كما طلب المستخدم
@@ -24,12 +30,14 @@ class CallCubit extends Cubit<CallState> {
   bool _isEnding = false;
 
   int? remoteUid;
-  int? callId;
+  int? callId;        // الـ call_session_id الحقيقي على السيرفر
+  int? studentId;
 
   String get currentDurationString => _formatDuration(_secondsElapsed);
 
-  Future<void> joinAndStartCall(int callId) async {
+  Future<void> joinAndStartCall(int callId, {int? studentId}) async {
     this.callId = callId;
+    this.studentId = studentId;
     _isEnding = false;
 
     Map<Permission, PermissionStatus> statuses = await [
@@ -54,13 +62,24 @@ class CallCubit extends Cubit<CallState> {
         _setupAgoraHandlers();
         _setupPusherListener();
 
+        if ((this.studentId == null || this.studentId == 0) && callId > 0) {
+          _callsRepo.getCallDetail(callId).then((detail) {
+            if (detail.status && detail.data.student.id > 0) {
+              this.studentId = detail.data.student.id;
+              debugPrint(
+                  '🧑 [CALL_CUBIT] Retrieved student ID: ${this.studentId}');
+            }
+          }).catchError((e) {
+            debugPrint('⚠️ [CALL_CUBIT] Failed to fetch call details: $e');
+          });
+        }
+
         await _agoraService.joinChannel(
           token: response.data!.agoraToken,
           channelName: response.data!.channelName,
           uid: response.data!.uid,
         );
 
-        // تأكيد حالة الكاميرا عند البدء (مغلقة كما في الـ State)
         await _agoraService.enableLocalVideo(isCamOn);
 
         _startTimer();
@@ -72,6 +91,66 @@ class CallCubit extends Cubit<CallState> {
         }
       } else {
         if (!isClosed) emit(CallError(response.message));
+      }
+    } catch (e) {
+      if (!isClosed) emit(CallError(e.toString()));
+    }
+  }
+
+  bool isBookingCall = false;
+
+  /// يُستخدم عندما يكون لدينا Token جاهز مسبقاً (مثل تدفق Bookings /start)
+  /// لا يُستدعى /join لأن Token أُعطي مباشرة من السيرفر
+  Future<void> startWithToken({
+    required String token,
+    required String channelName,
+    required int uid,
+    required int callId,
+    int? studentId,
+  }) async {
+    this.callId = callId;
+    this.studentId = studentId;
+    isBookingCall = true;
+    _isEnding = false;
+
+    // طلب صلاحيات الكاميرا والمايك — لكن مرة واحدة فقط
+    try {
+      final statuses = await [
+        Permission.camera,
+        Permission.microphone,
+      ].request();
+
+      if (statuses[Permission.microphone] != PermissionStatus.granted) {
+        if (!isClosed) {
+          emit(CallError('يرجى منح صلاحية الميكروفون للمتابعة'));
+        }
+        return;
+      }
+    } catch (e) {
+      debugPrint('⚠️ [CALL_CUBIT] Permission request error: $e');
+    }
+
+    if (!isClosed) emit(CallLoading());
+
+    try {
+      _setupAgoraHandlers();
+      _setupPusherListener();
+
+      await _agoraService.joinChannel(
+        token: token,
+        channelName: channelName,
+        uid: uid,
+      );
+
+      await _agoraService.enableLocalVideo(isCamOn);
+
+      _startTimer();
+      // لا نستدعي _startStatusCheckTimer في الحجوزات لأن callId هنا هو booking_id
+      // ولا يمثل call_session_id في جدول المكالمات الفورية
+
+      if (!isClosed) {
+        emit(CallLoaded());
+        emitToggles();
       }
     } catch (e) {
       if (!isClosed) emit(CallError(e.toString()));
@@ -213,7 +292,15 @@ class CallCubit extends Cubit<CallState> {
 
     if (callId != null) {
       try {
-        await _callsRepo.endCall(callId!);
+        if (isBookingCall) {
+          debugPrint(
+              '🚀 [CALL CUBIT] Ending booking call with call_session_id: $callId');
+          await _bookingsRepo.endBooking(callId!);
+        } else {
+          debugPrint(
+              '🚀 [CALL CUBIT] Ending direct call with callId: $callId');
+          await _callsRepo.endCall(callId!);
+        }
       } catch (e) {
         debugPrint('⚠️ Error ending call on server: $e');
       }
