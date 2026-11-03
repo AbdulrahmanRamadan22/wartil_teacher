@@ -334,13 +334,48 @@ class _CallHistoryCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(10.w),
+            width: 44.w,
+            height: 44.w,
             decoration: BoxDecoration(
-              color: ColorsManager.primaryColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
+              color: ColorsManager.primaryColor.withValues(alpha: 0.1),
+              border: Border.all(
+                color: ColorsManager.primaryColor.withValues(alpha: 0.2),
+                width: 1.5.w,
+              ),
             ),
-            child: Icon(Icons.phone_in_talk_rounded,
-                color: ColorsManager.primaryColor, size: 20.sp),
+            child: ClipOval(
+              child: (call.studentImageUrl != null &&
+                      call.studentImageUrl!.trim().isNotEmpty)
+                  ? CachedNetworkImage(
+                      imageUrl: call.studentImageUrl!,
+                      width: 44.w,
+                      height: 44.w,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Center(
+                        child: SizedBox(
+                          width: 16.w,
+                          height: 16.w,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              ColorsManager.primaryColor.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Icon(
+                        Icons.phone_in_talk_rounded,
+                        color: ColorsManager.primaryColor,
+                        size: 20.sp,
+                      ),
+                    )
+                  : Icon(
+                      Icons.phone_in_talk_rounded,
+                      color: ColorsManager.primaryColor,
+                      size: 20.sp,
+                    ),
+            ),
           ),
           SizedBox(width: 12.w),
           Expanded(

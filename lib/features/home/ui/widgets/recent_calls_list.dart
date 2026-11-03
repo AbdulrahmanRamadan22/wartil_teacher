@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:waratel_app/core/theming/colors.dart';
@@ -22,14 +23,18 @@ class RecentCallsList extends StatelessWidget {
             child: Center(
               child: Text(
                 'no_recent_calls'.tr(context),
-                style: TextStyle(color: Colors.grey, fontSize: 13.sp),
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  color: Colors.grey,
+                  fontSize: 13.sp,
+                ),
               ),
             ),
           );
         }
 
         return SizedBox(
-          height: 130.h,
+          height: 135.h,
           child: ListView.separated(
             padding: EdgeInsets.symmetric(horizontal: 16.w),
             scrollDirection: Axis.horizontal,
@@ -37,42 +42,72 @@ class RecentCallsList extends StatelessWidget {
             separatorBuilder: (ctx, i) => SizedBox(width: 14.w),
             itemBuilder: (context, index) {
               final call = calls[index];
+              final hasImage = call.studentImageUrl != null &&
+                  call.studentImageUrl!.trim().isNotEmpty;
+
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 60.w,
-                    height: 60.w,
+                    width: 62.w,
+                    height: 62.w,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                          color: ColorsManager.secondaryColor
-                              .withValues(alpha: 0.3),
-                          width: 2.w),
-                      color: Colors.grey.shade100,
-                    ),
-                    child: Center(
-                      child: Text(
-                        _getInitials(call.studentName),
-                        style: TextStyle(
-                            fontSize: 18.sp,
-                            fontWeight: FontWeight.bold,
-                            color: ColorsManager.secondaryColor),
+                        color: ColorsManager.primaryColor.withValues(alpha: 0.25),
+                        width: 2.w,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: ColorsManager.primaryColor.withValues(alpha: 0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: hasImage
+                          ? CachedNetworkImage(
+                              imageUrl: call.studentImageUrl!,
+                              width: 62.w,
+                              height: 62.w,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey.shade100,
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 20.w,
+                                    height: 20.w,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        ColorsManager.primaryColor
+                                            .withValues(alpha: 0.5),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) =>
+                                  _buildInitialsAvatar(call.studentName),
+                            )
+                          : _buildInitialsAvatar(call.studentName),
                     ),
                   ),
                   SizedBox(height: 6.h),
                   SizedBox(
-                    width: 70.w,
+                    width: 72.w,
                     child: Text(
                       call.studentName,
                       textAlign: TextAlign.center,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          fontSize: 11.sp,
-                          fontWeight: FontWeight.w600,
-                          color: ColorsManager.textPrimaryColor),
+                        fontFamily: 'Cairo',
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w600,
+                        color: ColorsManager.textPrimaryColor,
+                      ),
                     ),
                   ),
                 ],
@@ -81,6 +116,32 @@ class RecentCallsList extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildInitialsAvatar(String name) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            ColorsManager.primaryColor.withValues(alpha: 0.12),
+            ColorsManager.secondaryColor.withValues(alpha: 0.18),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          _getInitials(name),
+          style: TextStyle(
+            fontFamily: 'Cairo',
+            fontSize: 18.sp,
+            fontWeight: FontWeight.bold,
+            color: ColorsManager.primaryColor,
+          ),
+        ),
+      ),
     );
   }
 

@@ -21,6 +21,23 @@ class ProfileCubit extends Cubit<ProfileState> {
     }
   }
 
+  /// Called on pull-to-refresh — shows shimmer overlay without losing existing data.
+  Future<void> refreshProfile() async {
+    emit(ProfileRefreshing());
+    try {
+      final response = await profileRepo.getProfile();
+      profileData = response;
+      emit(ProfileLoaded(response));
+    } catch (e) {
+      // Keep old data visible on refresh failure
+      if (profileData != null) {
+        emit(ProfileLoaded(profileData!));
+      } else {
+        emit(ProfileError(e.toString().replaceFirst('Exception: ', '')));
+      }
+    }
+  }
+
   Future<void> logout() async {
     emit(LogoutLoading());
     try {

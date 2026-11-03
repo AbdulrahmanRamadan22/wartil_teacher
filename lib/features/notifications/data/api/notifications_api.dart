@@ -14,4 +14,13 @@ abstract class NotificationsApi {
 
   @POST(ApiConstants.notificationsMarkAsRead)
   Future<dynamic> markAsRead();
+
+  @POST(ApiConstants.notificationsDelete)
+  Future<DeleteNotificationResponse> deleteNotification(
+    @Body() Map<String, dynamic> body,
+  );
+
+  @POST(ApiConstants.notificationsDeleteAll)
+  Future<dynamic> deleteAllNotifications();
 }
+

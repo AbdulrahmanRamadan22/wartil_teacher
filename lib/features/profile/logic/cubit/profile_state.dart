@@ -8,6 +8,8 @@ class ProfileInitial extends ProfileState {}
 
 class ProfileLoading extends ProfileState {}
 
+class ProfileRefreshing extends ProfileState {}
+
 class ProfileLoaded extends ProfileState {
   final ProfileResponse profileResponse;
   ProfileLoaded(this.profileResponse);

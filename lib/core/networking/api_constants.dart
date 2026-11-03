@@ -61,4 +61,6 @@ class ApiConstants {
   // Notifications Endpoints
   static const String notifications = 'notifications';
   static const String notificationsMarkAsRead = 'notifications/mark-as-read';
+  static const String notificationsDelete = 'notifications/delete';
+  static const String notificationsDeleteAll = 'notifications/delete-all';
 }

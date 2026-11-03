@@ -14,4 +14,16 @@ class NotificationsRepo extends BaseRepository {
   Future<void> markAsRead() async {
     await handleApiCall(() => _api.markAsRead());
   }
+
+  Future<DeleteNotificationResponse> deleteNotification(
+      String notificationId) async {
+    return handleApiCall(() => _api.deleteNotification({
+          'notification_id': notificationId,
+        }));
+  }
+
+  Future<dynamic> deleteAllNotifications() async {
+    return handleApiCall(() => _api.deleteAllNotifications());
+  }
 }
+

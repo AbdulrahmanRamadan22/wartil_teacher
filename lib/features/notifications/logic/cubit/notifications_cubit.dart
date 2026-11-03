@@ -12,9 +12,7 @@ class NotificationsCubit extends Cubit<NotificationsState> {
 
   Future<void> loadNotifications() async {
     try {
-      if (state is! NotificationsLoaded) {
-        emit(NotificationsLoading());
-      }
+      emit(NotificationsLoading());
 
       final response = await _repo.getNotifications();
       if (response.status) {
@@ -37,12 +35,61 @@ class NotificationsCubit extends Cubit<NotificationsState> {
       unreadCount = 0;
       if (state is NotificationsLoaded) {
         final currentState = state as NotificationsLoaded;
-        emit(NotificationsLoaded(currentState.notifications, 0));
+        final updatedList = currentState.notifications.map((item) {
+          return NotificationModel(
+            id: item.id,
+            title: item.title,
+            message: item.message,
+            type: item.type,
+            payload: item.payload,
+            isRead: true,
+            createdAt: item.createdAt,
+            date: item.date,
+            time: item.time,
+          );
+        }).toList();
+        emit(NotificationsLoaded(updatedList, 0));
       }
     } catch (e) {
       // Keep current state but log error
     }
   }
+
+  Future<bool> deleteNotification(String notificationId) async {
+    try {
+      final response = await _repo.deleteNotification(notificationId);
+      if (response.status) {
+        if (response.data?.unreadCount != null) {
+          unreadCount = response.data!.unreadCount!;
+        }
+        if (state is NotificationsLoaded) {
+          final currentState = state as NotificationsLoaded;
+          final updatedList = currentState.notifications
+              .where((item) => item.id != notificationId)
+              .toList();
+          emit(NotificationsLoaded(updatedList, unreadCount));
+        }
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteAllNotifications() async {
+    try {
+      await _repo.deleteAllNotifications();
+      unreadCount = 0;
+      if (state is NotificationsLoaded) {
+        emit(NotificationsLoaded(const [], 0));
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
 
   void addRealTimeNotification(Map<String, dynamic> data) {
     unreadCount++;

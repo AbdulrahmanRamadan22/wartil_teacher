@@ -82,3 +82,31 @@ class NotificationModel {
   factory NotificationModel.fromJson(Map<String, dynamic> json) =>
       _$NotificationModelFromJson(json);
 }
+
+@JsonSerializable(createToJson: false)
+class DeleteNotificationResponse {
+  final bool status;
+  final String message;
+  final DeleteNotificationData? data;
+
+  DeleteNotificationResponse({
+    required this.status,
+    required this.message,
+    this.data,
+  });
+
+  factory DeleteNotificationResponse.fromJson(Map<String, dynamic> json) =>
+      _$DeleteNotificationResponseFromJson(json);
+}
+
+@JsonSerializable(createToJson: false)
+class DeleteNotificationData {
+  @JsonKey(name: 'unread_count')
+  final int? unreadCount;
+
+  DeleteNotificationData({this.unreadCount});
+
+  factory DeleteNotificationData.fromJson(Map<String, dynamic> json) =>
+      _$DeleteNotificationDataFromJson(json);
+}
+

@@ -1,34 +1,40 @@
 class CallModel {
   final int id;
   final String studentName;
+  final String? studentImageUrl;
   final String status;
   final int durationMinutes;
   final String date;
   final String time;
   final dynamic rating;
   final String? recordingUrl;
+  final bool isReported;
 
   CallModel({
     required this.id,
     required this.studentName,
+    this.studentImageUrl,
     required this.status,
     required this.durationMinutes,
     required this.date,
     required this.time,
     this.rating,
     this.recordingUrl,
+    this.isReported = false,
   });
 
   factory CallModel.fromJson(Map<String, dynamic> json) {
     return CallModel(
       id: json['id'] ?? 0,
       studentName: json['student_name'] ?? '',
+      studentImageUrl: json['student_image_url']?.toString(),
       status: json['status'] ?? '',
       durationMinutes: json['duration_minutes'] ?? 0,
       date: json['date'] ?? '',
       time: json['time'] ?? '',
       rating: json['rating'],
       recordingUrl: json['recording_url']?.toString(),
+      isReported: json['is_reported'] ?? false,
     );
   }
 }

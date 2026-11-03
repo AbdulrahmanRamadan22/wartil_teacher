@@ -44,3 +44,20 @@ NotificationModel _$NotificationModelFromJson(Map<String, dynamic> json) =>
       date: json['date'] as String,
       time: json['time'] as String,
     );
+
+DeleteNotificationResponse _$DeleteNotificationResponseFromJson(
+        Map<String, dynamic> json) =>
+    DeleteNotificationResponse(
+      status: json['status'] as bool,
+      message: json['message'] as String,
+      data: json['data'] == null
+          ? null
+          : DeleteNotificationData.fromJson(
+              json['data'] as Map<String, dynamic>),
+    );
+
+DeleteNotificationData _$DeleteNotificationDataFromJson(
+        Map<String, dynamic> json) =>
+    DeleteNotificationData(
+      unreadCount: (json['unread_count'] as num?)?.toInt(),
+    );
