@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- ═══════════════════════════════════════════════════ -->
     <!-- PERMISSIONS                                          -->
@@ -31,11 +32,13 @@
     <!-- Wake Lock - يمنع الشاشة من الإغلاق أثناء المكالمة -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
-    <!-- Foreground Service - لإبقاء اتصال استقبال المكالمات حياً في الخلفية -->
+    <!-- Foreground Service - لإبقاء استقبال المكالمات حياً في الخلفية -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+
+    <!-- إزالة إذن مشاركة الشاشة المجلوب تلقائياً من مكتبة Agora لمنع جوجل بلاي من طلبه -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" tools:node="remove"/>
 
     <!-- ═══════════════════════════════════════════════════ -->
     <!-- HARDWARE FEATURES - required="false"                 -->
@@ -105,12 +108,12 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- Foreground Service لإبقاء اتصال Pusher واستقبال المكالمات حياً في الخلفية -->
+        <!-- Foreground Service لإبقاء استقبال المكالمات حياً في الخلفية -->
         <service
             android:name=".CallKeepAliveService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="phoneCall|dataSync" />
+            android:foregroundServiceType="phoneCall" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

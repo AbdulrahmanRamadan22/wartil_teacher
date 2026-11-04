@@ -25,6 +25,7 @@ class SessionReportDialog extends StatefulWidget {
   final bool? initialIsPresent;
   final bool isAttendanceLocked;
   final VoidCallback? onSuccess;
+  final VoidCallback? onSkip;
 
   const SessionReportDialog({
     super.key,
@@ -39,6 +40,7 @@ class SessionReportDialog extends StatefulWidget {
     this.initialIsPresent,
     this.isAttendanceLocked = false,
     this.onSuccess,
+    this.onSkip,
   });
 
   @override
@@ -333,6 +335,19 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
                         ),
                 ),
               ),
+              if (widget.onSkip != null) ...[
+                SizedBox(height: 8.h),
+                TextButton(
+                  onPressed: isSubmitting ? null : widget.onSkip,
+                  child: Text(
+                    'cancel'.tr(context),
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 14.sp,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
