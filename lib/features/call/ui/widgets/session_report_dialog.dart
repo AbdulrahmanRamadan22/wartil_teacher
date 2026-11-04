@@ -25,7 +25,6 @@ class SessionReportDialog extends StatefulWidget {
   final bool? initialIsPresent;
   final bool isAttendanceLocked;
   final VoidCallback? onSuccess;
-  final VoidCallback? onSkip;
 
   const SessionReportDialog({
     super.key,
@@ -40,7 +39,6 @@ class SessionReportDialog extends StatefulWidget {
     this.initialIsPresent,
     this.isAttendanceLocked = false,
     this.onSuccess,
-    this.onSkip,
   });
 
   @override
@@ -95,35 +93,13 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const SizedBox(width: 40), // Balance close icon
-                  Expanded(
-                    child: Text(
-                      'session_report'.tr(context),
-                      style: TextStyle(
-                        fontSize: 20.sp,
-                        fontWeight: FontWeight.bold,
-                        color: ColorsManager.textPrimaryColor,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.grey),
-                    splashRadius: 20.r,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () {
-                      if (widget.onSkip != null) {
-                        widget.onSkip!();
-                      } else {
-                        Navigator.of(context).pop();
-                      }
-                    },
-                  ),
-                ],
+              Text(
+                'session_report'.tr(context),
+                style: TextStyle(
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.bold,
+                  color: ColorsManager.textPrimaryColor,
+                ),
               ),
               SizedBox(height: 5.h),
               Text(
@@ -210,9 +186,9 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
                     child: _buildAttendanceOption(
                       label: 'absent'.tr(context),
                       isSelected: !isPresent,
-                      isEnabled: !widget.isAttendanceLocked,
+                      isEnabled: !widget.isAttendanceLocked || !isPresent,
                       onTap: () {
-                        if (!widget.isAttendanceLocked) {
+                        if (!widget.isAttendanceLocked || !isPresent) {
                           setState(() => isPresent = false);
                         }
                       },
@@ -223,9 +199,9 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
                     child: _buildAttendanceOption(
                       label: 'present'.tr(context),
                       isSelected: isPresent,
-                      isEnabled: !widget.isAttendanceLocked,
+                      isEnabled: !widget.isAttendanceLocked || isPresent,
                       onTap: () {
-                        if (!widget.isAttendanceLocked) {
+                        if (!widget.isAttendanceLocked || isPresent) {
                           setState(() => isPresent = true);
                         }
                       },
@@ -330,9 +306,7 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
                 child: ElevatedButton(
                   onPressed: isSubmitting ? null : _saveAndEnd,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isPresent
-                        ? ColorsManager.primaryColor
-                        : Colors.redAccent,
+                    backgroundColor: ColorsManager.primaryColor,
                     disabledBackgroundColor: Colors.grey.shade300,
                     padding: EdgeInsets.symmetric(vertical: 14.h),
                     elevation: 0,
@@ -350,38 +324,13 @@ class _SessionReportDialogState extends State<SessionReportDialog> {
                           ),
                         )
                       : Text(
-                          isPresent
-                              ? 'save_report_end_session'.tr(context)
-                              : 'record_absence'.tr(context),
+                          'save_report_end_session'.tr(context),
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 16.sp,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                ),
-              ),
-
-              SizedBox(height: 8.h),
-
-              // Evaluate Later / Skip Button
-              TextButton(
-                onPressed: isSubmitting
-                    ? null
-                    : () {
-                        if (widget.onSkip != null) {
-                          widget.onSkip!();
-                        } else {
-                          Navigator.of(context).pop();
-                        }
-                      },
-                child: Text(
-                  'evaluate_later'.tr(context),
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
-                  ),
                 ),
               ),
             ],
