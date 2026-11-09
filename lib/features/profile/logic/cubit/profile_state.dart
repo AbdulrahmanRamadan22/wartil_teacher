@@ -28,3 +28,15 @@ class LogoutError extends ProfileState {
   final String error;
   LogoutError(this.error);
 }
+
+class DeleteAccountLoading extends ProfileState {}
+
+class DeleteAccountSuccess extends ProfileState {
+  final String message;
+  DeleteAccountSuccess(this.message);
+}
+
+class DeleteAccountError extends ProfileState {
+  final String error;
+  DeleteAccountError(this.error);
+}

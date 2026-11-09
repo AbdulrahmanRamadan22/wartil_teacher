@@ -65,6 +65,31 @@ class _ProfileScreenState extends State<ProfileScreen>
                 backgroundColor: ColorsManager.errorColor,
               ),
             );
+          } else if (state is DeleteAccountSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  state.message,
+                  style: const TextStyle(fontFamily: 'Cairo'),
+                ),
+                backgroundColor: ColorsManager.primaryColor,
+              ),
+            );
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              Routes.login,
+              (route) => false,
+            );
+          } else if (state is DeleteAccountError) {
+            Navigator.of(context, rootNavigator: true).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  state.error,
+                  style: const TextStyle(fontFamily: 'Cairo'),
+                ),
+                backgroundColor: ColorsManager.errorColor,
+              ),
+            );
           }
         },
         builder: (context, state) {
@@ -1208,24 +1233,58 @@ class _ProfileScreenState extends State<ProfileScreen>
 
         SizedBox(height: 24.h),
 
-        // Logout Action Button
+        // ── Logout Action Button ──────────────────────────────────────
         Container(
           width: double.infinity,
           height: 50.h,
           decoration: BoxDecoration(
+            color: Colors.white,
             borderRadius: BorderRadius.circular(14.r),
             border: Border.all(
-              color: ColorsManager.errorColor.withValues(alpha: 0.4),
+              color: ColorsManager.borderColor,
             ),
           ),
           child: TextButton.icon(
             onPressed: () => _confirmLogout(context),
-            icon: const Icon(
+            icon: Icon(
               Icons.logout_rounded,
-              color: ColorsManager.errorColor,
+              color: ColorsManager.textPrimaryColor,
+              size: 20.sp,
             ),
             label: Text(
               'logout'.tr(context),
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                color: ColorsManager.textPrimaryColor,
+                fontSize: 14.sp,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+
+        SizedBox(height: 12.h),
+
+        // ── Delete Account Action Button (Danger Zone) ────────────────
+        Container(
+          width: double.infinity,
+          height: 50.h,
+          decoration: BoxDecoration(
+            color: ColorsManager.errorColor.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(14.r),
+            border: Border.all(
+              color: ColorsManager.errorColor.withValues(alpha: 0.25),
+            ),
+          ),
+          child: TextButton.icon(
+            onPressed: () => _confirmDeleteAccount(context),
+            icon: Icon(
+              Icons.delete_forever_rounded,
+              color: ColorsManager.errorColor,
+              size: 20.sp,
+            ),
+            label: Text(
+              'delete_account'.tr(context),
               style: TextStyle(
                 fontFamily: 'Cairo',
                 color: ColorsManager.errorColor,
@@ -1235,7 +1294,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
           ),
         ),
-        SizedBox(height: 24.h),
+        SizedBox(height: 32.h),
       ],
     );
   }
@@ -1857,6 +1916,235 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (confirmed == true && context.mounted) {
       await getIt<ProfileCubit>().logout();
     }
+  }
+
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => SafeArea(
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
+          ),
+          padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 24.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle Bar
+              Container(
+                width: 40.w,
+                height: 4.h,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
+              ),
+              SizedBox(height: 20.h),
+
+              // Warning Icon with red container
+              Container(
+                width: 64.w,
+                height: 64.w,
+                decoration: BoxDecoration(
+                  color: ColorsManager.errorColor.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Container(
+                    width: 46.w,
+                    height: 46.w,
+                    decoration: const BoxDecoration(
+                      color: ColorsManager.errorColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.delete_forever_rounded,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: 16.h),
+
+              // Title
+              Text(
+                'delete_account_confirm_title'.tr(context),
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.bold,
+                  color: ColorsManager.textPrimaryColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 10.h),
+
+              // Description
+              Text(
+                'delete_account_confirm_desc'.tr(context),
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 13.sp,
+                  color: ColorsManager.textSecondaryColor,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 18.h),
+
+              // Warning Points Card
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(12.r),
+                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                ),
+                child: Column(
+                  children: [
+                    _buildWarningBullet(
+                      context,
+                      'delete_account_warning_1'.tr(context),
+                    ),
+                    SizedBox(height: 8.h),
+                    _buildWarningBullet(
+                      context,
+                      'delete_account_warning_2'.tr(context),
+                    ),
+                    SizedBox(height: 8.h),
+                    _buildWarningBullet(
+                      context,
+                      'delete_account_warning_3'.tr(context),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 24.h),
+
+              // Actions: Cancel & Delete
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(sheetCtx, false),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 12.h),
+                        side: BorderSide(color: Colors.grey.shade300),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                      ),
+                      child: Text(
+                        'cancel'.tr(context),
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14.sp,
+                          color: ColorsManager.textSecondaryColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(sheetCtx, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ColorsManager.errorColor,
+                        elevation: 0,
+                        padding: EdgeInsets.symmetric(vertical: 12.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                      ),
+                      child: Text(
+                        'yes_delete_account'.tr(context),
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.sp,
+                          color: Colors.white,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (loadingCtx) => PopScope(
+          canPop: false,
+          child: Dialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.r),
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
+              child: Row(
+                children: [
+                  const CircularProgressIndicator(
+                    color: ColorsManager.errorColor,
+                  ),
+                  SizedBox(width: 16.w),
+                  Expanded(
+                    child: Text(
+                      'deleting_account'.tr(context),
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 14.sp,
+                        color: ColorsManager.textPrimaryColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await getIt<ProfileCubit>().deleteAccount();
+    }
+  }
+
+  Widget _buildWarningBullet(BuildContext context, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          Icons.error_outline_rounded,
+          color: ColorsManager.errorColor,
+          size: 16.sp,
+        ),
+        SizedBox(width: 8.w),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 11.5.sp,
+              color: const Color(0xFF991B1B),
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

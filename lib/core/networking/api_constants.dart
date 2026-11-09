@@ -11,6 +11,7 @@ class ApiConstants {
 
   // Profile Endpoints
   static const String teacherProfile = 'teacher/profile';
+  static const String deleteAccount = 'account';
 
   // Ads Endpoints
   static const String teacherAds = 'teacher/ads';

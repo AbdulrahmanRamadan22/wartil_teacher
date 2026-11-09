@@ -18,4 +18,10 @@ class ProfileApi {
     final response = await _dio.post(ApiConstants.teacherLogout);
     return response.data as Map<String, dynamic>;
   }
+
+  /// DELETE /account — permanently deletes the user account
+  Future<Map<String, dynamic>> deleteAccount() async {
+    final response = await _dio.delete(ApiConstants.deleteAccount);
+    return response.data as Map<String, dynamic>;
+  }
 }

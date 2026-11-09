@@ -37,4 +37,25 @@ class ProfileRepo {
       await prefs.clear();
     }
   }
+
+  /// Delete account permanently — call API and clear local cache/services
+  Future<String> deleteAccount() async {
+    try {
+      final response = await _profileApi.deleteAccount();
+      final message =
+          response['message']?.toString() ?? 'Account deleted successfully.';
+      try {
+        await getIt<CallService>().dispose();
+      } catch (_) {}
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      return message;
+    } on DioException catch (e) {
+      final serverMessage = e.response?.data?['message'];
+      throw Exception(serverMessage ?? 'فشل حذف الحساب');
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('حدث خطأ غير متوقع أثناء حذف الحساب');
+    }
+  }
 }
