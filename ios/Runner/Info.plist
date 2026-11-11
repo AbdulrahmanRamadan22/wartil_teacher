@@ -45,13 +45,17 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIRequiresFullScreen</key>
+	<true/>
 	<!-- ── Privacy Usage Descriptions (Required by Apple) ── -->
 	<key>NSCameraUsageDescription</key>
 	<string>يستخدم تطبيق ورتّل الكاميرا لإجراء جلسات التعليم المرئي مع الطلاب عبر الإنترنت.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>يستخدم تطبيق ورتّل الميكروفون لإجراء جلسات التعليم الصوتي والمرئي مع الطلاب عبر الإنترنت.</string>
-	<key>NSUserNotificationsUsageDescription</key>
-	<string>يُرسل تطبيق ورتّل إشعارات لتنبيهك بمواعيد الجلسات والمكالمات القادمة.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>يستخدم تطبيق ورتّل البلوتوث لتوصيل السماعات اللاسلكية أثناء الجلسات التعليمية الصوتية والمرئية.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>يستخدم تطبيق ورتّل البلوتوث لتوصيل السماعات اللاسلكية أثناء الجلسات التعليمية الصوتية والمرئية.</string>
 	<!-- ── Background Modes (Required for CallKit & Agora Audio/Video Calls) ── -->
 	<key>UIBackgroundModes</key>
 	<array>
