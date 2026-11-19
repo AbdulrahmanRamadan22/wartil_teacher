@@ -38,7 +38,8 @@ class ApiConstants {
   static String teacherEndCall(int callId) => 'teacher/call/$callId/end';
 
   // Agora
-  static String agoraAppId = dotenv.get('AGORA_APP_ID', fallback: '');
+  static String agoraAppId = dotenv.get('AGORA_APP_ID',
+      fallback: '6682980a1c8948ad945fcf00ee47a4c1');
 
   // Wallet Endpoints
   static const String teacherWallet = 'teacher/wallet';

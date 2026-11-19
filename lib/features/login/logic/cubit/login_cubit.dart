@@ -46,8 +46,10 @@ class LoginCubit extends Cubit<LoginState> {
         await SharedPreferencesService.setLoggedIn(true);
 
         // ✅ 3. حفظ teacherId لإعادة تفعيل Pusher عند فتح التطبيق مجدداً
-        final int? teacherId = response.user?.teacherProfile?.id;
-        if (teacherId != null) {
+        final int? teacherId = response.profile?.id ??
+            response.user?.teacherProfile?.id ??
+            response.user?.id;
+        if (teacherId != null && teacherId > 0) {
           await SharedPreferencesService.saveTeacherId(teacherId);
           // تفعيل Pusher مباشرةً
           getIt<CallService>().initPusher(teacherId);

@@ -1,4 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:waratel_app/core/cache/shared_preferences.dart';
+import 'package:waratel_app/core/call/call_service.dart';
+import 'package:waratel_app/core/di/dependency_injection.dart';
 import 'package:waratel_app/features/profile/data/repos/profile_repo.dart';
 import 'package:waratel_app/features/profile/data/models/profile_models.dart';
 import 'package:waratel_app/features/profile/logic/cubit/profile_state.dart';
@@ -15,6 +18,14 @@ class ProfileCubit extends Cubit<ProfileState> {
     try {
       final response = await profileRepo.getProfile();
       profileData = response;
+
+      // ✅ تفعيل وحفظ Pusher بالمعرف الحقيقي للمعلم فور جلب البروفايل
+      final int? teacherId = response.profile?.id ?? response.user?.id;
+      if (teacherId != null && teacherId > 0) {
+        await SharedPreferencesService.saveTeacherId(teacherId);
+        getIt<CallService>().initPusher(teacherId);
+      }
+
       emit(ProfileLoaded(response));
     } catch (e) {
       emit(ProfileError(e.toString().replaceFirst('Exception: ', '')));
