@@ -558,6 +558,8 @@ class CallService {
     FlutterCallkitIncoming.onEvent.listen((CallEvent? event) async {
       if (event == null) return;
 
+      debugPrint('🔔 [CALLKIT EVENT] type: ${event.event} | name: ${event.eventName} | body: ${event.body}');
+
       switch (event) {
         // ✅ المعلم ضغط "قبول"
         case CallEventActionCallAccept(:final callKitParams):
