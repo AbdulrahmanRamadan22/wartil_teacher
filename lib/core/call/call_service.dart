@@ -220,7 +220,8 @@ class CallService {
           (data?['call_id'] ?? data?['id'] ?? '').toString();
       final int callIdInt = int.tryParse(callIdStr) ?? 0;
 
-      // إغلاق أي شاشة رنين نشطة في CallKit
+      // إغلاق أي شاشة رنين نشطة في CallKit والديالوج داخل التطبيق
+      _dismissInAppDialog();
       if (callIdStr.isNotEmpty) {
         await FlutterCallkitIncoming.endCall(callUuid(callIdStr));
       } else {
@@ -336,6 +337,134 @@ class CallService {
   }
 
   // ───────────────── 3. إظهار شاشة الرنين ────────────────
+  static DateTime? _lastIncomingCallTime;
+  static BuildContext? _inAppDialogContext;
+
+  static void _dismissInAppDialog() {
+    if (_inAppDialogContext != null && _inAppDialogContext!.mounted) {
+      try {
+        Navigator.of(_inAppDialogContext!).pop();
+      } catch (_) {}
+      _inAppDialogContext = null;
+    }
+  }
+
+  /// إظهار شاشة / نافذة رنين داخل التطبيق في حال كان المعلم فاتح التطبيق
+  static void _showInAppCallDialog({
+    required String callId,
+    required String studentName,
+    required String channelName,
+    int? studentId,
+  }) {
+    final context = navigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+
+    _dismissInAppDialog();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        _inAppDialogContext = dialogCtx;
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 10),
+                CircleAvatar(
+                  radius: 36,
+                  backgroundColor: const Color(0xFF0D9488),
+                  child: Text(
+                    studentName.isNotEmpty ? studentName[0] : 'ط',
+                    style: const TextStyle(
+                        fontSize: 28,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  studentName,
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'مكالمة واردة...',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // زر الرفض
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                      ),
+                      onPressed: () async {
+                        _dismissInAppDialog();
+                        await FlutterCallkitIncoming.endAllCalls();
+                        if (callId.isNotEmpty) {
+                          try {
+                            final api = getIt<CallApiService>();
+                            await api.endCall(int.tryParse(callId) ?? 0);
+                          } catch (_) {}
+                        }
+                      },
+                      icon: const Icon(Icons.call_end, size: 20),
+                      label: const Text('رفض'),
+                    ),
+                    // زر القبول
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D9488),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                      ),
+                      onPressed: () async {
+                        _dismissInAppDialog();
+                        await FlutterCallkitIncoming.endAllCalls();
+                        try {
+                          final api = getIt<CallApiService>();
+                          await _handleAccept(
+                            callId: callId,
+                            channelName: channelName,
+                            studentName: studentName,
+                            studentId: studentId,
+                            api: api,
+                          );
+                        } catch (_) {}
+                      },
+                      icon: const Icon(Icons.call, size: 20),
+                      label: const Text('قبول'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   /// UUID ثابت وموثوق مشتق من callId باستخدام RFC 4122 v5
   static String callUuid(String callId) {
     if (callId.isEmpty) return '00000000-0000-4000-8000-000000000000';
@@ -348,6 +477,17 @@ class CallService {
     required String channelName,
     int? studentId,
   }) async {
+    _lastIncomingCallTime = DateTime.now();
+
+    // 1. إظهار نافذة الرنين داخل التطبيق للمعلم إذا كان التطبيق مفتوحاً
+    _showInAppCallDialog(
+      callId: callId,
+      studentName: studentName,
+      channelName: channelName,
+      studentId: studentId,
+    );
+
+    // 2. إظهار شاشة رنين CallKit للنظام
     final String uuid = callUuid(callId);
     final params = CallKitParams(
       id: uuid,
@@ -388,7 +528,7 @@ class CallService {
         maximumCallGroups: 1,
         maximumCallsPerCallGroup: 1,
         audioSessionMode: 'videoChat',
-        audioSessionActive: true,
+        audioSessionActive: false, // لا تفعل جلسة الصوت أثناء الرنين لتفادي رفض CoreAudio في المحاكي
         audioSessionPreferredSampleRate: 44100.0,
         audioSessionPreferredIOBufferDuration: 0.005,
         supportsDTMF: true,
@@ -432,6 +572,7 @@ class CallService {
 
           debugPrint(
               '✅ [CALLKIT] قبول المكالمة: $callId | الطالب: $studentName | قناة: $channelName | studentId: $studentId');
+          _dismissInAppDialog();
           await _handleAccept(
             callId: callId,
             channelName: channelName,
@@ -445,7 +586,20 @@ class CallService {
         case CallEventActionCallDecline(:final callKitParams):
           final String callId =
               (callKitParams.extra?['call_id'] ?? callKitParams.id).toString();
-          debugPrint('❌ [CALLKIT] رفض المكالمة: $callId');
+          
+          // حماية من الإغلاق التلقائي الخاطئ (مثل خطأ عتاد الصوت في Simulator):
+          // لو جاء حدث الرفض خلال أقل من 1.5 ثانية من ظهور المكالمة، فهو صادر عن النظام وليس المعلم
+          final elapsed = _lastIncomingCallTime != null
+              ? DateTime.now().difference(_lastIncomingCallTime!).inMilliseconds
+              : 99999;
+          if (elapsed < 1500) {
+            debugPrint(
+                '⚠️ [CALLKIT] تم تجاهل رفض المكالمة التلقائي (خلال $elapsed ms — إغلاق من النظام أو محاكي)');
+            return;
+          }
+
+          debugPrint('❌ [CALLKIT] المعلم ضغط رفض: $callId');
+          _dismissInAppDialog();
           if (callId.isNotEmpty) {
             await api.endCall(int.tryParse(callId) ?? 0);
           }
@@ -453,6 +607,7 @@ class CallService {
 
         case CallEventActionCallTimeout(:final id):
           debugPrint('❌ [CALLKIT] انتهاء وقت المكالمة: $id');
+          _dismissInAppDialog();
           if (id != null && id.isNotEmpty) {
             await api.endCall(int.tryParse(id) ?? 0);
           }
@@ -473,6 +628,8 @@ class CallService {
     int? studentId,
     required CallApiService api,
   }) async {
+    _dismissInAppDialog();
+    await FlutterCallkitIncoming.endAllCalls();
     final int id = int.tryParse(callId) ?? 0;
     if (id == 0) {
       debugPrint('❌ [CALLKIT] callId غير صالح: "$callId"');
