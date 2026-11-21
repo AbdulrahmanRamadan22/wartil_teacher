@@ -219,7 +219,7 @@ class CallService {
 
       // إغلاق أي شاشة رنين نشطة في CallKit
       if (callIdStr.isNotEmpty) {
-        await FlutterCallkitIncoming.endCall(callIdStr);
+        await FlutterCallkitIncoming.endCall(_formatToUuid(callIdStr));
       } else {
         await FlutterCallkitIncoming.endAllCalls();
       }
@@ -333,14 +333,48 @@ class CallService {
   }
 
   // ───────────────── 3. إظهار شاشة الرنين ────────────────
+  /// تحويل معرف المكالمة (الرقمي) إلى صيغة UUID صالحة لـ iOS CallKit
+  static String _formatToUuid(String id) {
+    if (id.isEmpty) return '00000000-0000-4000-8000-000000000000';
+    final uuidRegex = RegExp(
+        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+    if (uuidRegex.hasMatch(id)) {
+      return id;
+    }
+    final int? numId = int.tryParse(id);
+    final String hexPart;
+    if (numId != null) {
+      hexPart = numId.toRadixString(16).padLeft(12, '0');
+    } else {
+      final hex =
+          id.codeUnits.map((c) => c.toRadixString(16).padLeft(2, '0')).join();
+      hexPart = hex.length >= 12
+          ? hex.substring(hex.length - 12)
+          : hex.padLeft(12, '0');
+    }
+    return '00000000-0000-4000-8000-$hexPart';
+  }
+
+  /// استخراج معرف المكالمة الأصلي من UUID أو النص
+  static String _extractCallId(String? id) {
+    if (id == null || id.isEmpty) return '';
+    if (id.startsWith('00000000-0000-4000-8000-')) {
+      final hex = id.substring('00000000-0000-4000-8000-'.length);
+      final parsed = int.tryParse(hex, radix: 16);
+      if (parsed != null) return parsed.toString();
+    }
+    return id;
+  }
+
   Future<void> _showIncomingCall({
     required String callId,
     required String studentName,
     required String channelName,
     int? studentId,
   }) async {
+    final String uuid = _formatToUuid(callId);
     final params = CallKitParams(
-      id: callId,
+      id: uuid,
       nameCaller: studentName,
       appName: 'ورتّل',
       avatar:
@@ -391,7 +425,7 @@ class CallService {
     );
 
     await FlutterCallkitIncoming.showCallkitIncoming(params);
-    debugPrint('✅ [CALLKIT] تم إظهار شاشة رنّ المكالمة بنجاح');
+    debugPrint('✅ [CALLKIT] تم إظهار شاشة رنّ المكالمة بنجاح (UUID: $uuid)');
   }
 
   // ───────────────── 4. الاستماع لقرار المعلم ────────────
@@ -403,10 +437,15 @@ class CallService {
       switch (event) {
         // ✅ المعلم ضغط "قبول"
         case CallEventActionCallAccept(:final callKitParams):
-          final String callId = callKitParams.id;
+          final String callId = (callKitParams.extra?['call_id'] ??
+                  _extractCallId(callKitParams.id))
+              .toString();
           final String studentName = callKitParams.nameCaller ?? '';
-          final String channelName = (callKitParams.extra?['channel_name'] ?? '').toString();
-          final int studentId = int.tryParse((callKitParams.extra?['student_id'] ?? '').toString()) ?? 0;
+          final String channelName =
+              (callKitParams.extra?['channel_name'] ?? '').toString();
+          final int studentId = int.tryParse(
+                  (callKitParams.extra?['student_id'] ?? '').toString()) ??
+              0;
 
           debugPrint(
               '✅ [CALLKIT] قبول المكالمة: $callId | الطالب: $studentName | قناة: $channelName | studentId: $studentId');
@@ -421,7 +460,9 @@ class CallService {
 
         // ❌ المعلم ضغط "رفض" أو انتهى وقت الرنين
         case CallEventActionCallDecline(:final callKitParams):
-          final String callId = callKitParams.id;
+          final String callId = (callKitParams.extra?['call_id'] ??
+                  _extractCallId(callKitParams.id))
+              .toString();
           debugPrint('❌ [CALLKIT] رفض المكالمة: $callId');
           if (callId.isNotEmpty) {
             await api.endCall(int.tryParse(callId) ?? 0);
@@ -429,9 +470,10 @@ class CallService {
           break;
 
         case CallEventActionCallTimeout(:final id):
-          debugPrint('❌ [CALLKIT] انتهاء وقت المكالمة: $id');
-          if (id.isNotEmpty) {
-            await api.endCall(int.tryParse(id) ?? 0);
+          final String callId = _extractCallId(id);
+          debugPrint('❌ [CALLKIT] انتهاء وقت المكالمة: $callId');
+          if (callId.isNotEmpty) {
+            await api.endCall(int.tryParse(callId) ?? 0);
           }
           break;
 
