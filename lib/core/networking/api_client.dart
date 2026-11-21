@@ -64,13 +64,13 @@ class ApiClient {
       ),
     );
 
-    // ── Pretty logger: debug only ────────────────────────────────
+    // ── Pretty logger: debug only (مخفي البيانات الحساسة ككلمات المرور والتوكن) ──
     if (kDebugMode) {
       dio.interceptors.add(
         PrettyDioLogger(
           requestHeader: false,
-          requestBody: true,
-          responseBody: true,
+          requestBody: false,
+          responseBody: false,
           responseHeader: false,
           error: true,
           compact: true,
