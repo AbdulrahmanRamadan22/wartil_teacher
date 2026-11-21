@@ -112,13 +112,14 @@ class _CallScreenState extends State<CallScreen> {
       create: (context) {
         final cubit = getIt<CallCubit>();
         if (widget.hasPreloadedToken) {
-          // تدفق الحجز: Token جاهز من /bookings/start — لا نستدعي /join
+          // تدفق Token جاهز (سواء من حجز أو بعد /join في قبول المكالمة)
           cubit.startWithToken(
             token: widget.token,
             channelName: widget.channelName,
             uid: widget.uid,
             callId: widget.callId ?? 0,
             studentId: widget.studentId,
+            isBooking: widget.reportableType == 'slot' || widget.reportableType == 'booking',
           );
         } else {
           // تدفق المكالمة المباشرة: نستدعي /join للحصول على Token

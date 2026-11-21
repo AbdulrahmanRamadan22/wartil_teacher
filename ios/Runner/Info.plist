@@ -47,6 +47,11 @@
 	<true/>
 	<key>UIRequiresFullScreen</key>
 	<true/>
+	<!-- ── Disable Impeller for Agora RTC Engine / Iris compatibility ── -->
+	<key>FLTEnableImpeller</key>
+	<false/>
+	<key>io.flutter.embedded_views_preview</key>
+	<true/>
 	<!-- ── Privacy Usage Descriptions (Required by Apple) ── -->
 	<key>NSCameraUsageDescription</key>
 	<string>يستخدم تطبيق ورتّل الكاميرا لإجراء جلسات التعليم المرئي مع الطلاب عبر الإنترنت.</string>

@@ -13,73 +13,87 @@ class AgoraService {
 
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
+  bool _isInitializing = false;
 
   // Callbacks
   void Function(int uid)? onUserJoined;
   void Function(int uid)? onUserLeft;
   void Function(String error)? onError;
 
-  /// تهيئة المحرك مرة واحدة فقط
+  /// تهيئة المحرك مرة واحدة فقط بشكل آمن ضد الاستدعاء المتزامن
   Future<void> initialize() async {
-    if (_isInitialized) return;
+    if (_isInitialized && _engine != null) return;
+    if (_isInitializing) {
+      while (_isInitializing) {
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+      return;
+    }
+    _isInitializing = true;
 
-    _engine = createAgoraRtcEngine();
+    try {
+      _engine = createAgoraRtcEngine();
 
-    await _engine!.initialize(RtcEngineContext(
-      appId: ApiConstants.agoraAppId,
-      channelProfile: ChannelProfileType.channelProfileCommunication,
-      audioScenario: AudioScenarioType.audioScenarioDefault,
-    ));
+      await _engine!.initialize(RtcEngineContext(
+        appId: ApiConstants.agoraAppId,
+        channelProfile: ChannelProfileType.channelProfileCommunication,
+        audioScenario: AudioScenarioType.audioScenarioDefault,
+      ));
 
-    debugPrint('🔵 [AGORA] تم تهيئة المحرك بنجاح');
+      debugPrint('🔵 [AGORA] تم تهيئة المحرك بنجاح');
 
-    // ضبط الدور كمذيع لليتمكن من الإرسال
-    await _engine!.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
+      // ضبط الدور كمذيع ليتمكن من الإرسال
+      await _engine!.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
 
-    // تفعيل الفيديو
-    await _engine!.enableVideo();
-    await _engine!.enableAudio();
+      // تفعيل الصوت والفيديو
+      await _engine!.enableAudio();
+      await _engine!.enableVideo();
 
-    // ضبط إعدادات الفيديو لتحسين الأداء وتقليل التقطيع (Stuttering/Distortion)
-    await _engine!.setVideoEncoderConfiguration(
-      const VideoEncoderConfiguration(
-        dimensions: VideoDimensions(width: 320, height: 240),
-        frameRate: 15,
-        bitrate: 200,
-      ),
-    );
+      // ضبط إعدادات الفيديو لتحسين الأداء وتقليل التقطيع (Stuttering/Distortion)
+      await _engine!.setVideoEncoderConfiguration(
+        const VideoEncoderConfiguration(
+          dimensions: VideoDimensions(width: 320, height: 240),
+          frameRate: 15,
+          bitrate: 200,
+        ),
+      );
 
-    // تسجيل الأحداث
-    _engine!.registerEventHandler(
-      RtcEngineEventHandler(
-        onJoinChannelSuccess: (connection, elapsed) {
-          debugPrint('✅ [AGORA] Joined channel successfully');
-        },
-        onUserJoined: (connection, uid, elapsed) {
-          debugPrint('👥 [AGORA] Remote user joined: $uid');
-          onUserJoined?.call(uid);
-        },
-        onUserOffline: (connection, uid, reason) {
-          debugPrint('👥 [AGORA] Remote user left: $uid | Reason: $reason');
-          onUserLeft?.call(uid);
-        },
-        onRemoteVideoStateChanged:
-            (connection, remoteUid, state, reason, elapsed) {
-          debugPrint(
-              '📹 [AGORA] Remote video state changed for $remoteUid: $state');
-          if (state == RemoteVideoState.remoteVideoStateStarting ||
-              state == RemoteVideoState.remoteVideoStateDecoding) {
-            onUserJoined?.call(remoteUid);
-          }
-        },
-        onError: (err, msg) {
-          debugPrint('❌ [AGORA ERROR] $err: $msg');
-          onError?.call(msg);
-        },
-      ),
-    );
+      // تسجيل الأحداث
+      _engine!.registerEventHandler(
+        RtcEngineEventHandler(
+          onJoinChannelSuccess: (connection, elapsed) {
+            debugPrint('✅ [AGORA] Joined channel successfully');
+          },
+          onUserJoined: (connection, uid, elapsed) {
+            debugPrint('👥 [AGORA] Remote user joined: $uid');
+            onUserJoined?.call(uid);
+          },
+          onUserOffline: (connection, uid, reason) {
+            debugPrint('👥 [AGORA] Remote user left: $uid | Reason: $reason');
+            onUserLeft?.call(uid);
+          },
+          onRemoteVideoStateChanged:
+              (connection, remoteUid, state, reason, elapsed) {
+            debugPrint(
+                '📹 [AGORA] Remote video state changed for $remoteUid: $state');
+            if (state == RemoteVideoState.remoteVideoStateStarting ||
+                state == RemoteVideoState.remoteVideoStateDecoding) {
+              onUserJoined?.call(remoteUid);
+            }
+          },
+          onError: (err, msg) {
+            debugPrint('❌ [AGORA ERROR] $err: $msg');
+            onError?.call(msg);
+          },
+        ),
+      );
 
-    _isInitialized = true;
+      _isInitialized = true;
+    } catch (e) {
+      debugPrint('❌ [AGORA] خطأ أثناء تهيئة المحرك: $e');
+    } finally {
+      _isInitializing = false;
+    }
   }
 
   /// الانضمام لقناة — الكاميرا مُغلقة بالافتراضي ويمكن تفعيلها أثناء المكالمة
@@ -89,13 +103,14 @@ class AgoraService {
     required int uid,
   }) async {
     await initialize();
+    if (_engine == null) return;
     await _engine!.joinChannel(
       token: token,
       channelId: channelName,
       uid: uid,
       options: const ChannelMediaOptions(
         clientRoleType: ClientRoleType.clientRoleBroadcaster,
-        publishCameraTrack: true, // ← تم التعديل لضمان عمل الكاميرا عند تفعيلها
+        publishCameraTrack: false, // الكاميرا مغلقة افتراضياً لمنع كراش المحاكي وتوفير البيانات
         publishMicrophoneTrack: true,
         autoSubscribeAudio: true,
         autoSubscribeVideo: true,
@@ -110,6 +125,7 @@ class AgoraService {
     required int uid,
   }) async {
     await initialize();
+    if (_engine == null) return;
     await _engine!.disableVideo();
     await _engine!.joinChannel(
       token: token,
@@ -127,22 +143,39 @@ class AgoraService {
 
   /// مغادرة القناة
   Future<void> leaveChannel() async {
-    if (_isInitialized) {
-      await _engine!.leaveChannel();
+    if (_isInitialized && _engine != null) {
+      try {
+        await _engine!.leaveChannel();
+      } catch (e) {
+        debugPrint('⚠️ [AGORA] leaveChannel error: $e');
+      }
     }
   }
 
   /// كتم/فتح الميكروفون المحلي
   Future<void> muteLocalMic(bool mute) async {
-    await _engine!.muteLocalAudioStream(mute);
+    if (_engine != null) {
+      await _engine!.muteLocalAudioStream(mute);
+    }
   }
 
-  /// تفعيل/إيقاف الكاميرا المحلية
+  /// تفعيل/إيقاف الكاميرا المحلية وتحديث مسار الفيديو في القناة ديناميكياً
   Future<void> enableLocalVideo(bool enable) async {
-    if (enable) {
-      await _engine!.enableLocalVideo(true);
-    } else {
-      await _engine!.enableLocalVideo(false);
+    if (_engine == null) return;
+    try {
+      if (enable) {
+        await _engine!.enableLocalVideo(true);
+        await _engine!.updateChannelMediaOptions(
+          const ChannelMediaOptions(publishCameraTrack: true),
+        );
+      } else {
+        await _engine!.enableLocalVideo(false);
+        await _engine!.updateChannelMediaOptions(
+          const ChannelMediaOptions(publishCameraTrack: false),
+        );
+      }
+    } catch (e) {
+      debugPrint('⚠️ [AGORA] enableLocalVideo error: $e');
     }
   }
 

@@ -366,8 +366,8 @@ class CallService {
       barrierDismissible: false,
       builder: (dialogCtx) {
         _inAppDialogContext = dialogCtx;
-        return WillPopScope(
-          onWillPop: () async => false,
+        return PopScope(
+          canPop: false,
           child: AlertDialog(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
@@ -544,7 +544,7 @@ class CallService {
     // التحقق من أن المكالمة تم تسجيلها بالفعل في CallKit
     try {
       final activeCalls = await FlutterCallkitIncoming.activeCalls();
-      if (activeCalls is List && activeCalls.isNotEmpty) {
+      if (activeCalls.isNotEmpty) {
         debugPrint('✅ [CALLKIT] تم إظهار شاشة رنّ المكالمة بنجاح (UUID: $uuid) | النشطة: ${activeCalls.length}');
       } else {
         debugPrint('⚠️ [CALLKIT] showCallkitIncoming تم استدعاؤه ولكن لا توجد مكالمة نشطة (طبيعي على أجهزة Simulator)');
@@ -610,7 +610,7 @@ class CallService {
         case CallEventActionCallTimeout(:final id):
           debugPrint('❌ [CALLKIT] انتهاء وقت المكالمة: $id');
           _dismissInAppDialog();
-          if (id != null && id.isNotEmpty) {
+          if (id.isNotEmpty) {
             await api.endCall(int.tryParse(id) ?? 0);
           }
           break;
@@ -632,6 +632,9 @@ class CallService {
   }) async {
     _dismissInAppDialog();
     await FlutterCallkitIncoming.endAllCalls();
+    // مهلة قصيرة للسماح لنظام iOS بتحرير AVAudioSession بعد إغلاق CallKit
+    await Future.delayed(const Duration(milliseconds: 300));
+
     final int id = int.tryParse(callId) ?? 0;
     if (id == 0) {
       debugPrint('❌ [CALLKIT] callId غير صالح: "$callId"');
@@ -671,6 +674,8 @@ class CallService {
         'studentName': studentName,
         'callId': id,
         'studentId': studentId,
+        'hasPreloadedToken': true,
+        'reportableType': 'call',
       },
     );
   }

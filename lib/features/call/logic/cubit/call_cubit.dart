@@ -99,7 +99,7 @@ class CallCubit extends Cubit<CallState> {
 
   bool isBookingCall = false;
 
-  /// يُستخدم عندما يكون لدينا Token جاهز مسبقاً (مثل تدفق Bookings /start)
+  /// يُستخدم عندما يكون لدينا Token جاهز مسبقاً (مثل تدفق Bookings /start أو قبول المكالمة بعد /join)
   /// لا يُستدعى /join لأن Token أُعطي مباشرة من السيرفر
   Future<void> startWithToken({
     required String token,
@@ -107,10 +107,11 @@ class CallCubit extends Cubit<CallState> {
     required int uid,
     required int callId,
     int? studentId,
+    bool isBooking = false,
   }) async {
     this.callId = callId;
     this.studentId = studentId;
-    isBookingCall = true;
+    isBookingCall = isBooking;
     _isEnding = false;
 
     // طلب صلاحيات الكاميرا والمايك — لكن مرة واحدة فقط
@@ -136,6 +137,17 @@ class CallCubit extends Cubit<CallState> {
       _setupAgoraHandlers();
       _setupPusherListener();
 
+      if ((this.studentId == null || this.studentId == 0) && callId > 0 && !isBookingCall) {
+        _callsRepo.getCallDetail(callId).then((detail) {
+          if (detail.status && detail.data.student.id > 0) {
+            this.studentId = detail.data.student.id;
+            debugPrint('🧑 [CALL_CUBIT] Retrieved student ID: ${this.studentId}');
+          }
+        }).catchError((e) {
+          debugPrint('⚠️ [CALL_CUBIT] Failed to fetch call details: $e');
+        });
+      }
+
       await _agoraService.joinChannel(
         token: token,
         channelName: channelName,
@@ -145,8 +157,9 @@ class CallCubit extends Cubit<CallState> {
       await _agoraService.enableLocalVideo(isCamOn);
 
       _startTimer();
-      // لا نستدعي _startStatusCheckTimer في الحجوزات لأن callId هنا هو booking_id
-      // ولا يمثل call_session_id في جدول المكالمات الفورية
+      if (!isBookingCall && callId > 0) {
+        _startStatusCheckTimer(callId);
+      }
 
       if (!isClosed) {
         emit(CallLoaded());
