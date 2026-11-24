@@ -61,6 +61,8 @@
 	<string>يستخدم تطبيق ورتّل البلوتوث لتوصيل السماعات اللاسلكية أثناء الجلسات التعليمية الصوتية والمرئية.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>يستخدم تطبيق ورتّل البلوتوث لتوصيل السماعات اللاسلكية أثناء الجلسات التعليمية الصوتية والمرئية.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>يستخدم تطبيق ورتّل الشبكة المحلية لتحسين جودة اتصال الصوت والفيديو أثناء الجلسات المباشرة.</string>
 	<!-- ── Background Modes (Required for CallKit & Agora Audio/Video Calls) ── -->
 	<key>UIBackgroundModes</key>
 	<array>

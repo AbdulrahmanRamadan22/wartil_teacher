@@ -1,1 +1,7 @@
 #include "Generated.xcconfig"
+
+// Prevent Xcode Release/TestFlight from stripping Agora / Iris C++ FFI symbols
+DEAD_CODE_STRIPPING = NO
+STRIP_INSTALLED_PRODUCT = NO
+STRIP_STYLE = non-global
+OTHER_LDFLAGS = $(inherited) -ObjC -lc++

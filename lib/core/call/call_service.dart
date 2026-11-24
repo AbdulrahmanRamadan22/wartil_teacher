@@ -594,7 +594,17 @@ class CallService {
         case CallEventActionCallDecline(:final callKitParams):
           final String callId =
               (callKitParams.extra?['call_id'] ?? callKitParams.id).toString();
-          
+
+          // إذا تم قبول هذه المكالمة للتو (مثلاً عبر الديالوج داخل التطبيق ثم استُدعي endAllCalls)،
+          // فلا نرسل endCall للخادم حتى لا تُرفض المكالمة عند الطالب!
+          if (_lastAcceptedCallId == callId &&
+              _lastAcceptTime != null &&
+              DateTime.now().difference(_lastAcceptTime!).inSeconds < 15) {
+            debugPrint(
+                '⚠️ [CALLKIT] تم تجاهل حدث الرفض لأن المكالمة $callId قُبلت للتو');
+            return;
+          }
+
           // حماية من الإغلاق التلقائي الخاطئ (مثل خطأ عتاد الصوت في Simulator):
           // لو جاء حدث الرفض خلال أقل من 1.5 ثانية من ظهور المكالمة، فهو صادر عن النظام وليس المعلم
           final elapsed = _lastIncomingCallTime != null
@@ -614,6 +624,13 @@ class CallService {
           break;
 
         case CallEventActionCallTimeout(:final id):
+          if (_lastAcceptedCallId != null &&
+              _lastAcceptTime != null &&
+              DateTime.now().difference(_lastAcceptTime!).inSeconds < 15 &&
+              (id == _lastAcceptedCallId || id == callUuid(_lastAcceptedCallId!))) {
+            debugPrint('⚠️ [CALLKIT] تم تجاهل انتهاء الوقت لأن المكالمة قُبلت للتو');
+            return;
+          }
           debugPrint('❌ [CALLKIT] انتهاء وقت المكالمة: $id');
           _dismissInAppDialog();
           if (id.isNotEmpty) {
