@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -553,9 +554,14 @@ class CallService {
   }
 
   // ───────────────── 4. الاستماع لقرار المعلم ────────────
-  /// يُستدعى مرة واحدة فقط في main.dart قبل runApp
+  static StreamSubscription<CallEvent?>? _callKitSub;
+  static String? _lastAcceptedCallId;
+  static DateTime? _lastAcceptTime;
+
+  /// يُستدعى في HomeLayout (وآمن ضد التكرار)
   static void listenToCallEvents(CallApiService api) {
-    FlutterCallkitIncoming.onEvent.listen((CallEvent? event) async {
+    _callKitSub?.cancel();
+    _callKitSub = FlutterCallkitIncoming.onEvent.listen((CallEvent? event) async {
       if (event == null) return;
 
       debugPrint('🔔 [CALLKIT EVENT] class: ${event.runtimeType} | name: ${event.eventName} | details: $event');
@@ -630,6 +636,16 @@ class CallService {
     int? studentId,
     required CallApiService api,
   }) async {
+    final now = DateTime.now();
+    if (_lastAcceptedCallId == callId &&
+        _lastAcceptTime != null &&
+        now.difference(_lastAcceptTime!).inSeconds < 5) {
+      debugPrint('⚠️ [CALLKIT] تجاهل قبول مكرر للمكالمة: $callId');
+      return;
+    }
+    _lastAcceptedCallId = callId;
+    _lastAcceptTime = now;
+
     _dismissInAppDialog();
     await FlutterCallkitIncoming.endAllCalls();
     // مهلة قصيرة للسماح لنظام iOS بتحرير AVAudioSession بعد إغلاق CallKit
