@@ -13,10 +13,10 @@ packages:
     dependency: "direct main"
     description:
       name: agora_rtc_engine
-      sha256: "6559294d18ce4445420e19dbdba10fb58cac955cd8f22dbceae26716e194d70e"
+      sha256: "153310a2cf92f2d126523795f61548131f3bb29eb05c310db5b01c7f4bc4cbfd"
       url: "https://pub.dev"
     source: hosted
-    version: "6.5.3"
+    version: "6.6.4"
   analyzer:
     dependency: transitive
     description:
@@ -497,10 +497,10 @@ packages:
     dependency: transitive
     description:
       name: js
-      sha256: "53385261521cc4a0c4658fd0ad07a7d14591cf8fc33abbceae306ddb974888dc"
+      sha256: f2c445dce49627136094980615a031419f7f3eb393237e4ecd97ac15dea343f3
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.2"
+    version: "0.6.7"
   json_annotation:
     dependency: "direct main"
     description:
@@ -809,10 +809,10 @@ packages:
     dependency: "direct main"
     description:
       name: pusher_channels_flutter
-      sha256: "683e4cb7c1803b3358142be895f144ec9818c282630ce6476a0b4dd75faf56b6"
+      sha256: "0b06194d85d1665d21e634ea091917b28670fb6d585d76903a4f72d894906000"
       url: "https://pub.dev"
     source: hosted
-    version: "2.6.0"
+    version: "2.4.0"
   retrofit:
     dependency: "direct main"
     description:
