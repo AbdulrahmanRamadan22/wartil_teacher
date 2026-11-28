@@ -186,7 +186,8 @@ class CallService {
       return;
     }
 
-    final nameLower = name.toLowerCase();
+    // أسماء الأحداث حسب دليل Pusher الرسمي (مع إزالة النقطة البادئة لو وُجدت)
+    final nameLower = name.toLowerCase().replaceFirst(RegExp(r'^\.'), '');
 
     // فك تشفير البيانات مسبقاً للتحقق من الحالة
     Map<String, dynamic>? data;
@@ -204,29 +205,41 @@ class CallService {
         .toString()
         .toLowerCase();
 
-    // 1. التحقق أولاً إذا كان الحدث يمثل انتهاء أو إلغاء للمكالمة
-    final bool isCallEnd = nameLower.contains('end') ||
-        nameLower.contains('cancel') ||
-        nameLower.contains('reject') ||
-        nameLower.contains('terminate') ||
-        nameLower.contains('finish') ||
-        statusStr == 'ended' ||
-        statusStr == 'cancelled' ||
-        statusStr == 'canceled' ||
-        statusStr == 'completed';
+    // 1. أحداث انتهاء المكالمة — بأسماء دقيقة فقط (لا contains).
+    //    call.ended على private-teacher.{teacherId}: {call_id, status: ended|cancelled|rejected|missed}
+    //    (يُبث عند إنهاء الطالب أو إلغائه أو انتهاء مهلة الرنين 35ث على السيرفر).
+    //    updated.status.call على قناة الطالب فقط — إبقاؤه كاحتياط لا أكثر.
+    //    SlotBookingCancelled ليس إنهاء مكالمة (يُعالج أسفل).
+    final bool isStatusEnded = nameLower == 'call.ended' ||
+        (nameLower == 'updated.status.call' && statusStr == 'ended');
+    final bool isStudentLeft = nameLower == 'studentleft';
 
-    if (isCallEnd) {
-      debugPrint('🛑 [PUSHER] ✅ تم التعرف على انتهاء/إلغاء المكالمة! (حدث: "$name")');
-      final String callIdStr =
-          (data?['call_id'] ?? data?['id'] ?? '').toString();
+    if (isStatusEnded || isStudentLeft) {
+      // StudentLeft: {teacherId, data: {call_session_id, ...}} — خصائص مباشرة بدون broadcastWith
+      final dynamic innerRaw = data?['data'];
+      final Map<String, dynamic>? inner =
+          innerRaw is Map ? Map<String, dynamic>.from(innerRaw) : null;
+      final String callIdStr = (data?['call_id'] ??
+              inner?['call_session_id'] ??
+              data?['call_session_id'] ??
+              '')
+          .toString();
       final int callIdInt = int.tryParse(callIdStr) ?? 0;
 
-      // إغلاق أي شاشة رنين نشطة في CallKit والديالوج داخل التطبيق
+      // ممنوع نبلّغ الـ Cubit بـ 0 (كان بيطابق أي مكالمة)
+      if (callIdInt <= 0) {
+        debugPrint(
+            '⚠️ [PUSHER] تجاهل "$name": لا يوجد call_id صالح — البيانات: $dataString');
+        return;
+      }
+
+      debugPrint(
+          '🛑 [PUSHER] ✅ انتهاء المكالمة (حدث: "$name", callId: $callIdInt)');
       _dismissInAppDialog();
-      if (callIdStr.isNotEmpty) {
-        await FlutterCallkitIncoming.endCall(callUuid(callIdStr));
-      } else {
-        await FlutterCallkitIncoming.endAllCalls();
+      if (isStatusEnded) {
+        final uuid = callUuid(callIdStr);
+        await FlutterCallkitIncoming.endCall(uuid);
+        _uuidToCallId.remove(uuid);
       }
 
       // إخطار شاشة المكالمة الحالية لإنهائها فوراً
@@ -234,9 +247,8 @@ class CallService {
       return;
     }
 
-    // 2. التحقق من مكالمة واردة
-    final bool isIncomingCall =
-        nameLower.contains('call') || nameLower.contains('incoming');
+    // 2. مكالمة واردة: incoming.call → {call_id, channel_name, student_name}
+    final bool isIncomingCall = nameLower == 'incoming.call';
 
     if (isIncomingCall) {
       debugPrint('🚀 [PUSHER] ✅ تم التعرف على مكالمة واردة! (حدث: "$name")');
@@ -263,7 +275,10 @@ class CallService {
         }
 
         final String studentIdStr =
-            (callData['student_id'] ?? callData['caller_id'] ?? callData['user_id'] ?? '')
+            (callData['student_id'] ??
+                    callData['caller_id'] ??
+                    callData['user_id'] ??
+                    '')
                 .toString();
         final int? studentId = int.tryParse(studentIdStr);
 
@@ -280,31 +295,32 @@ class CallService {
         debugPrint('❌ [PUSHER] فشل فك تشفير بيانات الحدث: $e');
         debugPrint('❌ [PUSHER] البيانات الخام: $rawData');
       }
-    } else if (name.contains('AdminBroadcast')) {
+    } else if (nameLower == 'adminbroadcast') {
       debugPrint(
           '🚀 [PUSHER] ✅ تم التعرف على إشعار من الإدارة! (حدث: "$name")');
       try {
-        final Map<String, dynamic> data = (rawData is String)
+        final Map<String, dynamic> adminData = (rawData is String)
             ? jsonDecode(rawData) as Map<String, dynamic>
             : rawData as Map<String, dynamic>;
 
         debugPrint(
-            '🔔 [PUSHER] الإشعار: ${data['title']} - ${data['message']}');
+            '🔔 [PUSHER] الإشعار: ${adminData['title']} - ${adminData['message']}');
 
-        getIt<NotificationsCubit>().addRealTimeNotification(data);
+        getIt<NotificationsCubit>().addRealTimeNotification(adminData);
 
         // عرض الإشعار في نظام الموبايل
         LocalNotificationService.showNotification(
           id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          title: data['title']?.toString() ?? 'إشعار جديد',
-          body: data['message']?.toString() ?? '',
-          payload: jsonEncode(data),
+          title: adminData['title']?.toString() ?? 'إشعار جديد',
+          body: adminData['message']?.toString() ?? '',
+          payload: jsonEncode(adminData),
         );
       } catch (e) {
         debugPrint('❌ [PUSHER] فشل فك إشعار الإدارة: $e');
       }
-    } else if (name.contains('StudentJoined') || nameLower.contains('studentjoined')) {
-      debugPrint('🎓 [PUSHER] ✅ انضمام طالب للجلسة المجدولة! (حدث: "$name")');
+    } else if (nameLower == 'studentjoined') {
+      debugPrint(
+          '🎓 [PUSHER] ✅ انضمام طالب للجلسة المجدولة! (حدث: "$name")');
       try {
         final Map<String, dynamic> eventData = data ??
             ((rawData is String)
@@ -332,6 +348,14 @@ class CallService {
       } catch (e) {
         debugPrint('⚠️ [PUSHER] خطأ معالجة حدث StudentJoined: $e');
       }
+    } else if (nameLower == 'newslotbooked' ||
+        nameLower == 'slotbookingcancelled') {
+      // حجز جديد / إلغاء حجز من الطالب → تحديث القوائم فقط (بدون إشعار محلي لتفادي التكرار مع FCM)
+      debugPrint('📅 [PUSHER] تحديث الحجوزات بسبب الحدث: "$name"');
+      try {
+        getIt<BookingsCubit>().loadBookings();
+        getIt<HomeCubit>().loadSoon();
+      } catch (_) {}
     } else {
       debugPrint('ℹ️ [PUSHER] حدث غير معروف تم تجاهله: "$name"');
     }
@@ -341,7 +365,49 @@ class CallService {
   static DateTime? _lastIncomingCallTime;
   static BuildContext? _inAppDialogContext;
 
+  /// مدة الرنين — مشتركة بين CallKit والديالوج الداخلي (الرجاء مطابقتها لمهلة السيرفر أو أكبر شوية)
+  static const Duration _ringDuration = Duration(seconds: 30);
+  static Timer? _inAppDialogTimer;
+
+  /// خريطة UUID بتاع CallKit → call_id الحقيقي على السيرفر.
+  /// بتُستخدم كـ fallback لما الـ event ما يحملش extra (زي CallEventActionCallTimeout).
+  static final Map<String, String> _uuidToCallId = {};
+
+  /// يستخرج call_id الحقيقي (رقم > 0) من extra أو من الخريطة.
+  /// يرجّع '' لو ما قدرش — وساعتها ممنوع نبعت endCall للسيرفر.
+  static String _resolveCallId({dynamic extraCallId, String? uuid}) {
+    final fromExtra = extraCallId?.toString().trim() ?? '';
+    if ((int.tryParse(fromExtra) ?? 0) > 0) return fromExtra;
+
+    if (uuid != null && uuid.isNotEmpty) {
+      final mapped = _uuidToCallId[uuid];
+      if (mapped != null && (int.tryParse(mapped) ?? 0) > 0) return mapped;
+    }
+    return '';
+  }
+
+  /// يبعت endCall للسيرفر فقط لو call_id صالح (> 0). ما يبعتش 0 أبداً.
+  static Future<void> _endCallOnServer(
+    CallApiService api,
+    String callId, {
+    String source = '',
+  }) async {
+    final id = int.tryParse(callId) ?? 0;
+    if (id <= 0) {
+      debugPrint(
+          '⚠️ [CALLKIT] تجاهل endCall($source): call_id غير صالح ("$callId")');
+      return;
+    }
+    try {
+      await api.endCall(id);
+    } catch (e) {
+      debugPrint('⚠️ [CALLKIT] فشل endCall($source) للمكالمة $id: $e');
+    }
+  }
+
   static void _dismissInAppDialog() {
+    _inAppDialogTimer?.cancel();
+    _inAppDialogTimer = null;
     if (_inAppDialogContext != null && _inAppDialogContext!.mounted) {
       try {
         Navigator.of(_inAppDialogContext!).pop();
@@ -419,12 +485,11 @@ class CallService {
                       onPressed: () async {
                         _dismissInAppDialog();
                         await FlutterCallkitIncoming.endAllCalls();
-                        if (callId.isNotEmpty) {
-                          try {
-                            final api = getIt<CallApiService>();
-                            await api.endCall(int.tryParse(callId) ?? 0);
-                          } catch (_) {}
-                        }
+                        await _endCallOnServer(
+                          getIt<CallApiService>(),
+                          callId,
+                          source: 'in-app decline',
+                        );
                       },
                       icon: const Icon(Icons.call_end, size: 20),
                       label: const Text('رفض'),
@@ -464,12 +529,21 @@ class CallService {
         );
       },
     );
+
+    // Fallback: لو حدث Timeout/End من CallKit ما وصلش، الديالوج يتقفل لوحده بعد مدة الرنين.
+    // (إبلاغ السيرفر بيتم من حدث Timeout بتاع CallKit أو من مهلة السيرفر نفسه)
+    _inAppDialogTimer?.cancel();
+    _inAppDialogTimer = Timer(_ringDuration, () {
+      debugPrint('⏱️ [IN-APP] انتهت مدة الرنين — إغلاق الديالوج الداخلي');
+      _dismissInAppDialog();
+    });
   }
 
   /// UUID ثابت وموثوق مشتق من callId باستخدام RFC 4122 v5
   static String callUuid(String callId) {
     if (callId.isEmpty) return '00000000-0000-4000-8000-000000000000';
-    return _uuid.v5('6ba7b811-9dad-11d1-80b4-00c04fd430c8', 'wartil-call-$callId');
+    return _uuid.v5(
+        '6ba7b811-9dad-11d1-80b4-00c04fd430c8', 'wartil-call-$callId');
   }
 
   Future<void> _showIncomingCall({
@@ -490,6 +564,7 @@ class CallService {
 
     // 2. إظهار شاشة رنين CallKit للنظام
     final String uuid = callUuid(callId);
+    _uuidToCallId[uuid] = callId; // ربط UUID → call_id الحقيقي (لحدث Timeout)
     final params = CallKitParams(
       id: uuid,
       nameCaller: studentName,
@@ -498,7 +573,7 @@ class CallService {
           'https://ui-avatars.com/api/?name=$studentName&background=0d9488&color=fff',
       handle: 'مكالمة واردة',
       type: 0, // 0 = صوت فقط (زر القبول يظهر أيقونة هاتف)
-      duration: 30000, // 30 ثانية ثم يُلغى تلقائياً
+      duration: _ringDuration.inMilliseconds, // 30 ثانية ثم يُلغى تلقائياً
       missedCallNotification: const NotificationParams(
         showNotification: true,
         isShowCallback: false,
@@ -529,7 +604,8 @@ class CallService {
         maximumCallGroups: 1,
         maximumCallsPerCallGroup: 1,
         audioSessionMode: 'videoChat',
-        audioSessionActive: false, // لا تفعل جلسة الصوت أثناء الرنين لتفادي رفض CoreAudio في المحاكي
+        audioSessionActive:
+            false, // لا تفعل جلسة الصوت أثناء الرنين لتفادي رفض CoreAudio في المحاكي
         audioSessionPreferredSampleRate: 44100.0,
         audioSessionPreferredIOBufferDuration: 0.005,
         supportsDTMF: true,
@@ -541,14 +617,16 @@ class CallService {
     );
 
     await FlutterCallkitIncoming.showCallkitIncoming(params);
-    
+
     // التحقق من أن المكالمة تم تسجيلها بالفعل في CallKit
     try {
       final activeCalls = await FlutterCallkitIncoming.activeCalls();
       if (activeCalls.isNotEmpty) {
-        debugPrint('✅ [CALLKIT] تم إظهار شاشة رنّ المكالمة بنجاح (UUID: $uuid) | النشطة: ${activeCalls.length}');
+        debugPrint(
+            '✅ [CALLKIT] تم إظهار شاشة رنّ المكالمة بنجاح (UUID: $uuid) | النشطة: ${activeCalls.length}');
       } else {
-        debugPrint('⚠️ [CALLKIT] showCallkitIncoming تم استدعاؤه ولكن لا توجد مكالمة نشطة (طبيعي على أجهزة Simulator)');
+        debugPrint(
+            '⚠️ [CALLKIT] showCallkitIncoming تم استدعاؤه ولكن لا توجد مكالمة نشطة (طبيعي على أجهزة Simulator)');
       }
     } catch (_) {}
   }
@@ -561,16 +639,20 @@ class CallService {
   /// يُستدعى في HomeLayout (وآمن ضد التكرار)
   static void listenToCallEvents(CallApiService api) {
     _callKitSub?.cancel();
-    _callKitSub = FlutterCallkitIncoming.onEvent.listen((CallEvent? event) async {
+    _callKitSub =
+        FlutterCallkitIncoming.onEvent.listen((CallEvent? event) async {
       if (event == null) return;
 
-      debugPrint('🔔 [CALLKIT EVENT] class: ${event.runtimeType} | name: ${event.eventName} | details: $event');
+      debugPrint(
+          '🔔 [CALLKIT EVENT] class: ${event.runtimeType} | name: ${event.eventName} | details: $event');
 
       switch (event) {
         // ✅ المعلم ضغط "قبول"
         case CallEventActionCallAccept(:final callKitParams):
-          final String callId =
-              (callKitParams.extra?['call_id'] ?? callKitParams.id).toString();
+          final String callId = _resolveCallId(
+            extraCallId: callKitParams.extra?['call_id'],
+            uuid: callKitParams.id,
+          );
           final String studentName = callKitParams.nameCaller ?? '';
           final String channelName =
               (callKitParams.extra?['channel_name'] ?? '').toString();
@@ -590,10 +672,12 @@ class CallService {
           );
           break;
 
-        // ❌ المعلم ضغط "رفض" أو انتهى وقت الرنين
+        // ❌ المعلم ضغط "رفض"
         case CallEventActionCallDecline(:final callKitParams):
-          final String callId =
-              (callKitParams.extra?['call_id'] ?? callKitParams.id).toString();
+          final String callId = _resolveCallId(
+            extraCallId: callKitParams.extra?['call_id'],
+            uuid: callKitParams.id,
+          );
 
           // إذا تم قبول هذه المكالمة للتو (مثلاً عبر الديالوج داخل التطبيق ثم استُدعي endAllCalls)،
           // فلا نرسل endCall للخادم حتى لا تُرفض المكالمة عند الطالب!
@@ -608,7 +692,9 @@ class CallService {
           // حماية من الإغلاق التلقائي الخاطئ (مثل خطأ عتاد الصوت في Simulator):
           // لو جاء حدث الرفض خلال أقل من 1.5 ثانية من ظهور المكالمة، فهو صادر عن النظام وليس المعلم
           final elapsed = _lastIncomingCallTime != null
-              ? DateTime.now().difference(_lastIncomingCallTime!).inMilliseconds
+              ? DateTime.now()
+                  .difference(_lastIncomingCallTime!)
+                  .inMilliseconds
               : 99999;
           if (elapsed < 1500) {
             debugPrint(
@@ -618,24 +704,30 @@ class CallService {
 
           debugPrint('❌ [CALLKIT] المعلم ضغط رفض: $callId');
           _dismissInAppDialog();
-          if (callId.isNotEmpty) {
-            await api.endCall(int.tryParse(callId) ?? 0);
-          }
+          await _endCallOnServer(api, callId, source: 'decline');
+          _uuidToCallId.remove(callKitParams.id);
           break;
 
+        // ⏱️ انتهى وقت الرنين (30 ثانية) بدون رد
+        // الـ id هنا هو UUID بتاع CallKit، مش رقم المكالمة — نحوّله من الخريطة.
         case CallEventActionCallTimeout(:final id):
+          final String callId = _resolveCallId(uuid: id);
+
           if (_lastAcceptedCallId != null &&
               _lastAcceptTime != null &&
               DateTime.now().difference(_lastAcceptTime!).inSeconds < 15 &&
-              (id == _lastAcceptedCallId || id == callUuid(_lastAcceptedCallId!))) {
-            debugPrint('⚠️ [CALLKIT] تم تجاهل انتهاء الوقت لأن المكالمة قُبلت للتو');
+              (callId == _lastAcceptedCallId ||
+                  id == _lastAcceptedCallId ||
+                  id == callUuid(_lastAcceptedCallId!))) {
+            debugPrint(
+                '⚠️ [CALLKIT] تم تجاهل انتهاء الوقت لأن المكالمة قُبلت للتو');
             return;
           }
-          debugPrint('❌ [CALLKIT] انتهاء وقت المكالمة: $id');
+          debugPrint(
+              '❌ [CALLKIT] انتهاء وقت المكالمة: uuid=$id → callId=$callId');
           _dismissInAppDialog();
-          if (id.isNotEmpty) {
-            await api.endCall(int.tryParse(id) ?? 0);
-          }
+          await _endCallOnServer(api, callId, source: 'timeout');
+          _uuidToCallId.remove(id);
           break;
 
         default:
