@@ -107,6 +107,8 @@ class CallCubit extends Cubit<CallState> {
           uid: response.data!.uid,
         );
 
+        if (await _leaveIfEndedDuringJoin()) return;
+
         await _agoraService.enableLocalVideo(isCamOn);
 
         _startTimer();
@@ -185,6 +187,8 @@ class CallCubit extends Cubit<CallState> {
         uid: uid,
       );
 
+      if (await _leaveIfEndedDuringJoin()) return;
+
       await _agoraService.enableLocalVideo(isCamOn);
 
       _startTimer();
@@ -200,6 +204,18 @@ class CallCubit extends Cubit<CallState> {
       _cleanupAfterFailedJoin();
       if (!isClosed) emit(CallError(e.toString()));
     }
+  }
+
+  /// لو المكالمة انتهت (call.ended / Agora) أثناء انضمامنا للقناة، نخرج منها فوراً.
+  /// السبب: leaveChannel الأول بيتنفذ قبل اكتمال الانضمام فبيبقى بلا أثر،
+  /// وبعدها joinChannel بيكمل ويسيب المعلم جوه القناة بعد انتهاء المكالمة.
+  Future<bool> _leaveIfEndedDuringJoin() async {
+    if (!_isEnding && !isClosed) return false;
+    try {
+      await _agoraService.leaveChannel();
+    } catch (_) {}
+    _hasLeftChannel = true;
+    return true;
   }
 
   void _cleanupAfterFailedJoin() {
