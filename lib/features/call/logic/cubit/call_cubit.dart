@@ -15,6 +15,7 @@ class CallCubit extends Cubit<CallState> {
 
   static const Set<String> _endedStatuses = {
     'ended',
+    'missed',
     'completed',
     'cancelled',
     'canceled',
@@ -399,8 +400,7 @@ class CallCubit extends Cubit<CallState> {
               '🚀 [CALL CUBIT] Ending booking call with call_session_id: $callId');
           await _bookingsRepo.endBooking(callId!);
         } else {
-          debugPrint(
-              '🚀 [CALL CUBIT] Ending direct call with callId: $callId');
+          debugPrint('🚀 [CALL CUBIT] Ending direct call with callId: $callId');
           await _callsRepo.endCall(callId!);
         }
       } catch (e) {
